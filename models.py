@@ -1,12 +1,11 @@
 import sqlite3
 import json
+import config
 from datetime import datetime
 from contextlib import contextmanager
 
-DB_PATH = 'scaler.db'
-
 def get_db():
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(config.DB_PATH)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA foreign_keys=ON")
@@ -18,6 +17,9 @@ def db_conn():
     try:
         yield conn
         conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
     finally:
         conn.close()
 
@@ -54,10 +56,10 @@ def init_db():
                 name TEXT NOT NULL,
                 description TEXT,
                 account_id TEXT,
-                conditions TEXT,  -- JSON
-                actions TEXT,     -- JSON
+                conditions TEXT,
+                actions TEXT,
                 status TEXT DEFAULT 'active',
-                schedule TEXT,    -- JSON (check interval, etc.)
+                schedule TEXT,
                 last_run TEXT,
                 run_count INTEGER DEFAULT 0,
                 created_at TEXT DEFAULT (datetime('now')),
@@ -75,7 +77,7 @@ def init_db():
                 target_type TEXT,
                 target_id TEXT,
                 target_name TEXT,
-                details TEXT,  -- JSON
+                details TEXT,
                 undoable INTEGER DEFAULT 1,
                 undone INTEGER DEFAULT 0,
                 created_at TEXT DEFAULT (datetime('now'))
@@ -88,7 +90,7 @@ def init_db():
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER,
                 title TEXT DEFAULT 'New Chat',
-                messages TEXT DEFAULT '[]',  -- JSON array
+                messages TEXT DEFAULT '[]',
                 created_at TEXT DEFAULT (datetime('now')),
                 updated_at TEXT DEFAULT (datetime('now'))
             )
@@ -152,6 +154,53 @@ def init_db():
                 error TEXT,
                 user_agent TEXT,
                 metadata TEXT,
+                created_at TEXT DEFAULT (datetime('now'))
+            )
+        """)
+
+        # Scaling configs
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS scaling_configs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                account_id TEXT DEFAULT '',
+                max_budget_increase_pct REAL DEFAULT 30,
+                min_roas_threshold REAL DEFAULT 2.0,
+                lookback_days INTEGER DEFAULT 7,
+                kill_loss_threshold REAL DEFAULT 500,
+                created_at TEXT DEFAULT (datetime('now')),
+                updated_at TEXT DEFAULT (datetime('now'))
+            )
+        """)
+
+        # Experiments (A/B tests)
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS experiments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                name TEXT NOT NULL,
+                account_id TEXT DEFAULT '',
+                variant_a_adset_id TEXT NOT NULL,
+                variant_b_adset_id TEXT NOT NULL,
+                metric TEXT DEFAULT 'cpc',
+                duration_days INTEGER DEFAULT 7,
+                status TEXT DEFAULT 'running',
+                winner TEXT,
+                conclusion TEXT,
+                created_at TEXT DEFAULT (datetime('now')),
+                updated_at TEXT DEFAULT (datetime('now'))
+            )
+        """)
+
+        # Notification channels (Slack/Discord)
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS notification_channels (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                channel_type TEXT NOT NULL,
+                webhook_url TEXT NOT NULL,
+                name TEXT DEFAULT '',
+                connected INTEGER DEFAULT 1,
                 created_at TEXT DEFAULT (datetime('now'))
             )
         """)

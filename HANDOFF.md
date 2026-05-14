@@ -4,219 +4,224 @@
 
 ## 📌 Project Overview
 
-**Facebook Ad Scaler** — เครื่องมือจัดการและ scale โฆษณา Facebook อัตโนมัติ
+**Facebook Ad Scaler** — เครื่องมือจัดการและ scale โฆษณา Facebook อัตโนมัติ ด้วย AI
 
 - **Repo:** https://github.com/dmz2001TH/facebook-ad-scaler
-- **Tech Stack:** Flask + SQLite + Pre-built React Frontend (static assets)
+- **Tech Stack:** Flask + SQLite + Pre-built React Frontend (static assets) + OpenAI
 - **Frontend:** Pre-built React SPA (harvested from Cloudflare Pages), served as static files
 - **Font:** Kanit (Thai/English)
 - **Port:** 8080
 - **Branch:** `master`
+- **Total API Endpoints:** 70+
 
 ---
 
-## 🔄 Workflow (Flow การทำงาน)
+## 🔄 Architecture
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    Facebook Ad Scaler                     │
-├─────────────────────────────────────────────────────────┤
-│                                                          │
-│  React SPA (Frontend)        Flask Backend (app.py)      │
-│  ┌──────────────────┐        ┌───────────────────────┐   │
-│  │ Static assets     │◄──────│ / & /assets/*          │   │
-│  │ (pre-built chunks)│        │                       │   │
-│  └──────────────────┘        │  43 API Endpoints     │   │
-│                               │  ┌─────────────────┐  │   │
-│                               │  │ Auth (5)         │  │   │
-│  Browser ────────────────────►│  │ FB API (12)      │  │   │
-│  (User)                       │  │ Rules (11)       │  │   │
-│                               │  │ AdsGPT (4)       │  │   │
-│                               │  │ Bot Actions (3)  │  │   │
-│                               │  │ Team (7)         │  │   │
-│                               │  │ Telegram (4)     │  │   │
-│                               │  │ Notifications(2) │  │   │
-│                               │  │ Tracking (2)     │  │   │
-│                               │  └─────────────────┘  │   │
-│                               └───────────┬───────────┘   │
-│                                           │               │
-│                               ┌───────────▼───────────┐   │
-│                               │ SQLite (scaler.db)     │   │
-│                               │ 10 tables              │   │
-│                               └───────────────────────┘   │
-│                                           │               │
-│                               ┌───────────▼───────────┐   │
-│                               │ Facebook Marketing API │   │
-│                               │ (graph.facebook.com)   │   │
-│                               └───────────────────────┘   │
-│                                           │               │
-│                               ┌───────────▼───────────┐   │
-│                               │ Telegram Bot API       │   │
-│                               │ (api.telegram.org)     │   │
-│                               └───────────────────────┘   │
-└─────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│                      Facebook Ad Scaler                       │
+├──────────────────────────────────────────────────────────────┤
+│                                                               │
+│  React SPA (Frontend)         Flask Backend (app.py)          │
+│  ┌──────────────────┐         ┌───────────────────────────┐   │
+│  │ Static assets     │◄───────│ / & /assets/*             │   │
+│  │ (pre-built chunks)│         │                           │   │
+│  └──────────────────┘         │  70+ API Endpoints        │   │
+│                                │  ┌──────────────────────┐ │   │
+│  Browser ─────────────────────►│  │ Auth (5)             │ │   │
+│  (User)                        │  │ FB API (18)          │ │   │
+│                                │  │ Smart Scaling (5)    │ │   │
+│  config.py ← .env              │  │ Rules (11)           │ │   │
+│  ┌──────────────────┐          │  │ AdsGPT (5)           │ │   │
+│  │ SECRET_KEY        │          │  │ Experiments (5)      │ │   │
+│  │ OPENAI_API_KEY    │          │  │ Anomaly Detection(1) │ │   │
+│  │ DB_PATH           │          │  │ Fatigue Detection(2) │ │   │
+│  │ LOG_LEVEL         │          │  │ Budget Pacing (1)    │ │   │
+│  └──────────────────┘          │  │ Budget Calendar (1)  │ │   │
+│                                │  │ Bot Actions (3)      │ │   │
+│                                │  │ Team (7)             │ │   │
+│                                │  │ Notifications (6)    │ │   │
+│                                │  │ Tracking (2)         │ │   │
+│                                │  │ System (3)           │ │   │
+│                                │  └──────────────────────┘ │   │
+│                                └─────────────┬─────────────┘   │
+│                                              │                 │
+│                                ┌─────────────▼─────────────┐   │
+│                                │ SQLite (scaler.db)         │   │
+│                                │ 13 tables                  │   │
+│                                └───────────────────────────┘   │
+│                                              │                 │
+│                    ┌─────────────────────────┼──────────┐      │
+│                    ▼                         ▼          ▼      │
+│            Facebook Marketing API    OpenAI API   Webhooks    │
+│            (graph.facebook.com)     (optional)  TG/Slack/DC   │
+└──────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
 ## ✅ What's Done (สิ่งที่เสร็จแล้ว)
 
-### 1. Backend — Flask App (`app.py`) — 43 API Endpoints ✅
+### 1. Core Backend — Flask App (`app.py`, ~2500 lines)
 
-#### Auth System (5 endpoints)
-- ✅ `GET /api/auth/me` — Get current user (auto-login first user if no session)
-- ✅ `POST /api/auth/register` — Register new user
-- ✅ `POST /api/auth/login` — Login with email/password + session
-- ✅ `POST /api/auth/logout` — Clear session
-- ✅ `GET /api/auth/facebook` — Facebook OAuth placeholder (501 not implemented)
+#### Auth System (5 endpoints) ✅
+- `GET /api/auth/me` — Get current user (auto-login first user)
+- `POST /api/auth/register` — Register new user
+- `POST /api/auth/login` — Login with email/password + session
+- `POST /api/auth/logout` — Clear session
+- `GET /api/auth/facebook` — Facebook OAuth placeholder (501)
 
-#### Facebook Marketing API Integration (12 endpoints)
-- ✅ `POST /api/fb/token` — Save FB access token to user record
-- ✅ `GET /api/fb/ad-accounts` — List ad accounts (id, name, status, currency, timezone, business)
-- ✅ `GET /api/fb/campaigns` — List campaigns with budget/status info
-- ✅ `PUT /api/fb/campaigns/:id/status` — Enable/pause campaign (logs to bot_actions)
-- ✅ `PUT /api/fb/campaigns/:id/budget` — Update daily/lifetime budget (logs to bot_actions)
-- ✅ `GET /api/fb/adsets` — List ad sets with targeting
-- ✅ `GET /api/fb/ads` — List ads with creative
-- ✅ `PUT /api/fb/ads/:id/creative` — Update ad creative
-- ✅ `GET /api/fb/insights` — Performance insights (impressions, clicks, spend, reach, CTR, CPC, CPM, actions)
-- ✅ `GET /api/fb/insights/compare` — Compare last_7d vs last_14d
-- ✅ `GET /api/fb/summary` — Account-level summary stats
-- ✅ `GET /api/fb/activity` — Activity log from bot_actions table
-- ✅ `GET /api/fb/audience` — Audience reach estimate
+#### Facebook Marketing API (18 endpoints) ✅
+- `POST /api/fb/token` — Save FB access token
+- `GET /api/fb/ad-accounts` — List all ad accounts
+- `GET /api/fb/accounts/compare` — Compare metrics across accounts
+- `GET /api/fb/accounts/:id/summary` — Per-account summary
+- `GET /api/fb/campaigns` — List campaigns
+- `PUT /api/fb/campaigns/:id/status` — Enable/pause campaign
+- `PUT /api/fb/campaigns/:id/budget` — Update budget
+- `GET /api/fb/adsets` — List ad sets
+- `GET /api/fb/ads` — List ads
+- `PUT /api/fb/ads/:id/creative` — Update creative
+- `GET /api/fb/insights` — Performance insights
+- `GET /api/fb/insights/compare` — Compare date ranges
+- `GET /api/fb/summary` — Dashboard summary
+- `GET /api/fb/activity` — Activity log
+- `GET /api/fb/audience` — Audience insights
+- `GET /api/fb/pacing` — Budget pacing dashboard
+- `GET /api/fb/fatigue` — Creative fatigue detection (all ads)
+- `GET /api/fb/fatigue/:id` — Single ad fatigue analysis
+- `GET /api/fb/budget-calendar` — Budget change history
+- `GET /api/fb/anomalies` — Statistical anomaly detection
 
-#### Auto-Rules Engine (11 endpoints)
-- ✅ `GET /api/rules` — List all rules
-- ✅ `POST /api/rules` — Create rule
-- ✅ `GET /api/rules/:id` — Get single rule
-- ✅ `PUT /api/rules/:id` — Update rule
-- ✅ `DELETE /api/rules/:id` — Delete rule
-- ✅ `POST /api/rules/bulk-delete` — Bulk delete by IDs
-- ✅ `POST /api/rules/:id/test-clone` — Clone rule (paused)
-- ✅ `GET /api/rules/conflicts` — Detect conflicting rules (same campaign targets)
-- ✅ `POST /api/rules/emergency-pause-all` — Pause all rules
-- ✅ `GET /api/rules/export` — Export rules as JSON
-- ✅ `POST /api/rules/import` — Import rules from JSON
-- ✅ `POST /api/rules/preview` — Dry run preview
+#### Smart Scaling Intelligence (5 endpoints) ✅
+- `POST /api/scaling/config` — Save scaling config
+- `GET /api/scaling/config` — Get scaling config
+- `POST /api/scaling/analyze` — Analyze campaigns → recommendations
+- `POST /api/scaling/execute` — Execute scaling changes (with confirmation)
+- `POST /api/scaling/kill-switch` — Emergency pause all losing campaigns
 
-#### AdsGPT — AI Chat (4 endpoints)
-- ✅ `GET /api/ads-gpt/conversations` — List conversations
-- ✅ `GET /api/ads-gpt/conversations/:id` — Get conversation with messages
-- ✅ `DELETE /api/ads-gpt/conversations/:id` — Delete conversation
-- ✅ `POST /api/ads-gpt/chat` — Send message & get AI response
-- 📝 AI responses are **hardcoded Thai ad expertise** — needs real OpenAI integration
+#### Auto-Rules Engine (11 endpoints) ✅
+- Full CRUD + bulk delete, clone, conflict detection
+- Emergency pause all, export/import JSON, preview (dry run)
 
-#### Bot Actions — Audit Trail (3 endpoints)
-- ✅ `GET /api/bot/actions` — List actions (with undo status)
-- ✅ `POST /api/bot/actions` — Create action entry
-- ✅ `POST /api/bot/actions/:id/undo` — Mark action as undone
+#### AdsGPT — AI Chat (5 endpoints) ✅
+- `GET /api/ads-gpt/conversations` — List conversations
+- `GET /api/ads-gpt/conversations/:id` — Get conversation
+- `DELETE /api/ads-gpt/conversations/:id` — Delete conversation
+- `POST /api/ads-gpt/chat` — Chat (OpenAI + streaming SSE + fallback)
+- `POST /api/ads-gpt/settings` — Save OpenAI API key
 
-#### Team Management (7 endpoints)
-- ✅ `GET /api/team/members` — List team members
-- ✅ `DELETE /api/team/members/:id` — Remove member
-- ✅ `PUT /api/team/members/:id/role` — Update member role
-- ✅ `GET /api/team/invites` — List pending invites
-- ✅ `POST /api/team/invite` — Send invite by email
-- ✅ `DELETE /api/team/invites/:id` — Revoke invite
-- ✅ `POST /api/team/invite/:id/accept` — Accept invite (create team_member)
+#### A/B Test Tracker (5 endpoints) ✅
+- `POST /api/experiments` — Create experiment
+- `GET /api/experiments` — List experiments
+- `GET /api/experiments/:id` — Get with live FB data comparison
+- `POST /api/experiments/:id/conclude` — Declare winner (statistical)
+- `DELETE /api/experiments/:id` — Delete experiment
 
-#### Telegram Notifications (4 endpoints)
-- ✅ `GET /api/telegram/status` — Check connection status
-- ✅ `POST /api/telegram/connect` — Connect bot (store token + chat_id)
-- ✅ `POST /api/telegram/disconnect` — Disconnect
-- ✅ `POST /api/telegram/test-send` — Send test message via Telegram API
+#### Anomaly Detection (1 endpoint) ✅
+- Z-score based: flags metrics > 2 std dev from 7-day mean
+- Checks CPC, CPM, CTR, spend per campaign
 
-#### Other (4 endpoints)
-- ✅ `GET /api/notifications/settings` — Get notification preferences
-- ✅ `PUT /api/notifications/settings` — Update notification preferences
-- ✅ `POST /api/track/error` — Track frontend errors
-- ✅ `POST /api/track/pageview` — Track page views
-- ✅ `GET /api/announcements/active` — Active announcements (returns empty)
-- ✅ `POST /api/ai/post-booster/:id` — AI post booster placeholder
+#### Bot Actions — Audit Trail (3 endpoints) ✅
+- List, create, undo actions
 
-### 2. Database Schema (`models.py`) — 10 SQLite Tables ✅
+#### Team Management (7 endpoints) ✅
+- Members: list, remove, update role
+- Invites: list, send, revoke, accept
 
-| Table | Purpose | Key Columns |
-|-------|---------|-------------|
-| `users` | User accounts + FB tokens | id, email, password, name, fb_token, role |
-| `settings` | Key-value settings per user | user_id, key, value |
-| `rules` | Auto-rules engine | id, user_id, name, conditions(JSON), actions(JSON), status, schedule(JSON) |
-| `bot_actions` | Audit trail with undo | id, user_id, action_type, target_type, target_id, details(JSON), undoable, undone |
-| `conversations` | AdsGPT chat history | id, user_id, title, messages(JSON) |
-| `team_members` | Team membership | id, owner_id, user_id, role |
-| `team_invites` | Pending invites | id, owner_id, email, role, status |
-| `telegram_connections` | Telegram bot config | id, user_id, account_id, chat_id, bot_token, connected |
-| `notification_settings` | Per-user notification prefs | user_id, email_enabled, telegram_enabled, rules_fired, budget_alerts, daily_summary |
-| `tracking` | Error + pageview tracking | id, event_type, page, error, user_agent, metadata |
+#### Notifications (6 endpoints) ✅
+- Telegram: status, connect, disconnect, test-send
+- Slack/Discord: connect webhook, test-send
+- Unified `send_notification()` dispatcher
 
-### 3. Frontend Assets ✅
-- ✅ `templates/index.html` — SPA entry point (4658 bytes)
-- ✅ `static/assets/` — 11 pre-built React chunks (~1.5MB total)
-  - `index-r215tC_7.js` (main bundle)
-  - `index-DnZrT2z0.css` (styles)
-  - `Dashboard-JKh4wXFv.js`, `Campaigns-okGSZ_-n.js`, `Rules-DbQk4gH6.js`, `AdsGPT-B_FgLFEi.js`
-  - `react-vendor-C0IOBbdh.js`, `CartesianChart-DvZ9Ka_W.js`, `createLucideIcon-CZdZkbWY.js`
-  - `rolldown-runtime-S-ySWqyJ.js`, `chart-column-DcT2Lgok.js`
+#### Other (3 endpoints) ✅
+- `GET /api/notifications/settings` + `PUT` — Notification prefs
+- `POST /api/track/error` + `POST /api/track/pageview` — Tracking
+- `GET /api/announcements/active` — Announcements
+- `POST /api/ai/post-booster/:id` — AI post booster
+- `GET /api/health` — Health check
 
-### 4. Tooling ✅
-- ✅ `harvester.py` — Downloads frontend assets from Cloudflare Pages
-- ✅ `start_scaler.bat` — Windows launcher
-- ✅ `.gitignore` — Excludes .db, .log, __pycache__, .env
+### 2. Database Schema (`models.py`) — 13 SQLite Tables ✅
+
+| Table | Purpose |
+|-------|---------|
+| `users` | User accounts + FB tokens |
+| `settings` | Key-value settings per user |
+| `rules` | Auto-rules engine |
+| `bot_actions` | Audit trail with undo |
+| `conversations` | AdsGPT chat history |
+| `team_members` | Team membership + roles |
+| `team_invites` | Pending invites |
+| `telegram_connections` | Telegram bot config |
+| `notification_channels` | Slack/Discord webhooks |
+| `notification_settings` | Per-user notification prefs |
+| `tracking` | Error + pageview tracking |
+| `scaling_configs` | Smart scaling configuration |
+| `experiments` | A/B test experiments |
+
+### 3. AI Service (`ai_service.py`) ✅
+- OpenAI integration with streaming (SSE)
+- Fallback to hardcoded Thai ad expertise responses
+- Context-aware: feeds FB campaign data into prompts
+
+### 4. Config Management (`config.py`) ✅
+- Environment-based via `.env` file
+- No hardcoded secrets
+
+### 5. Production Files ✅
+- `Dockerfile` — Container deployment with health check
+- `requirements.txt` — All dependencies
+- `test_endpoints.py` — 67/67 tests passing
+- `README.md` — Professional documentation
+- `.env.example` — Environment template
 
 ---
 
 ## 📋 What's Next (สิ่งที่ต้องทำต่อ)
 
-### 🔴 Priority 1 — OpenAI Integration for AdsGPT
-**Status:** NOT STARTED
-- [ ] Replace `generate_ads_gpt_response()` in `app.py` (line ~370) with real OpenAI API calls
-- [ ] Add `openai` to requirements / pip install
-- [ ] Store OpenAI API key in user settings or .env
-- [ ] Add streaming responses (`text/event-stream`) for chat UX
-- [ ] Context-aware: pull FB insights data into system prompt so AI can analyze real campaigns
+### 🔴 Priority 1 — Password Security
+- [ ] Hash passwords with bcrypt (currently plaintext!)
+- [ ] Add `bcrypt` or `werkzeug.security` to requirements
 
-### 🔴 Priority 2 — Rule Execution Engine
-**Status:** NOT STARTED
-- [ ] Add background scheduler (APScheduler or threading.Timer)
-- [ ] Implement rule condition evaluation:
-  - Check campaign/adset/ad metrics against conditions
-  - Support operators: `>`, `<`, `>=`, `<=`, `==`
-  - Support metrics: CPC, CTR, CPM, ROAS, spend, impressions
-- [ ] Implement rule action execution:
-  - Pause/enable campaigns/adsets/ads
-  - Adjust budgets (increase/decrease by % or amount)
-  - Send Telegram notifications
-- [ ] Update `last_run` and `run_count` after each execution
-- [ ] Add execution logs to bot_actions
-
-### 🟡 Priority 3 — Security Hardening
-**Status:** NOT STARTED
-- [ ] Password hashing (currently stored in plaintext!)
-- [ ] CSRF protection
-- [ ] Rate limiting on auth endpoints
-- [ ] Input validation/sanitization
-- [ ] Replace `app.secret_key` with env variable
-
-### 🟡 Priority 4 — Facebook OAuth
-**Status:** PLACEHOLDER ONLY
+### 🔴 Priority 2 — Facebook OAuth
 - [ ] Implement full OAuth2 flow in `/api/auth/facebook`
 - [ ] Store FB token automatically after OAuth
 - [ ] Token refresh mechanism
 
-### 🟢 Priority 5 — Frontend Enhancements
-**Status:** NOT STARTED
-- [ ] Dark mode support
-- [ ] Real-time WebSocket for live data updates
-- [ ] PDF report generation
-- [ ] Multi-language support (currently Thai-only in AI responses)
+### 🟡 Priority 3 — Background Scheduler
+- [ ] APScheduler for rule execution on schedule
+- [ ] Auto-scale execution on cron
+- [ ] Periodic anomaly scanning
 
-### 🟢 Priority 6 — Production Deployment
-**Status:** NOT STARTED
-- [ ] Replace Flask dev server with Gunicorn/uvicorn
-- [ ] Add Dockerfile
-- [ ] Environment-based config (dev/staging/prod)
-- [ ] Database migrations system
-- [ ] Logging framework
+### 🟡 Priority 4 — Production Deployment
+- [ ] Replace Flask dev server with Gunicorn
+- [ ] HTTPS/TLS setup
+- [ ] Rate limiting (flask-limiter)
+- [ ] CORS configuration
+
+### 🟢 Priority 5 — Frontend Enhancements
+- [ ] Dark mode
+- [ ] Real-time WebSocket for live data
+- [ ] PDF report generation
+
+---
+
+## 🔧 How to Run
+
+```bash
+# Development
+pip install -r requirements.txt
+cp .env.example .env  # edit as needed
+python app.py         # → http://localhost:8080
+
+# Docker
+docker build -t ad-scaler .
+docker run -p 8080:8080 -v ad-scaler-data:/data ad-scaler
+
+# Tests
+python test_endpoints.py
+```
 
 ---
 
@@ -224,14 +229,19 @@
 
 ```
 facebook-ad-scaler/
-├── app.py              # Flask app + all 43 API routes (~800 lines)
-├── models.py           # SQLite schema (10 tables) + DB helpers (~150 lines)
-├── harvester.py        # Asset downloader from CF Pages
-├── scaler.db           # SQLite database (auto-created, gitignored)
-├── start_scaler.bat    # Windows launcher
+├── app.py              # Flask app — 70+ API endpoints (~2500 lines)
+├── models.py           # SQLite schema (13 tables) + DB helpers
+├── ai_service.py       # OpenAI integration + fallback responses
+├── config.py           # Environment-based configuration
+├── test_endpoints.py   # Endpoint test suite (67 tests)
+├── requirements.txt    # Python dependencies
+├── Dockerfile          # Container deployment
+├── .env.example        # Environment template
+├── .gitignore          # Excludes .db, .log, .env, __pycache__
 ├── HANDOFF.md          # THIS FILE — agent handoff doc
-├── .gitignore          # Excludes .db, .log, __pycache__, .env
-├── scaler_output.log   # Last run log
+├── README.md           # Project documentation
+├── harvester.py        # Asset downloader from CF Pages
+├── start_scaler.bat    # Windows launcher
 ├── templates/
 │   └── index.html      # SPA entry point
 └── static/
@@ -240,53 +250,43 @@ facebook-ad-scaler/
 
 ---
 
-## 🔧 How to Run
-
-```bash
-cd facebook-ad-scaler
-pip install flask requests
-python app.py        # → http://localhost:8080
-```
-
-**Requirements:** Python 3.8+, flask, requests
-**Optional:** openai (for AdsGPT integration)
-
----
-
 ## 🤖 Agent Handoff Protocol
 
 ### How to Continue
-1. **Read this file first** — it's the single source of truth
+1. **Read this file first** — single source of truth
 2. **Check git log** — `git log --oneline` for recent changes
 3. **Pick from "What's Next"** — work on highest priority unstarted item
-4. **Update this file** — mark items done, add notes, update verification log
-5. **Commit & push** — `git add -A && git commit -m "..." && git push`
+4. **Run tests** — `python test_endpoints.py` must pass 67/67
+5. **Update this file** — mark items done, update verification log
+6. **Commit & push** — `git add -A && git commit -m "..." && git push`
 
 ### Key Code Locations
 | What | Where | Notes |
 |------|-------|-------|
-| AI response generation | `app.py` → `generate_ads_gpt_response()` | Replace with OpenAI |
+| AI response generation | `ai_service.py` → `generate_response()` | OpenAI + fallback |
 | FB API calls | `app.py` → `fb_api()` helper | Uses requests lib |
-| User auth | `app.py` → `get_current_user()` | Session-based, auto-login first user |
-| DB schema | `models.py` → `init_db()` | 10 tables, WAL mode |
-| Frontend entry | `templates/index.html` | React SPA root |
+| User auth | `app.py` → `get_current_user()` | Session-based |
+| Notification dispatch | `app.py` → `send_notification()` | TG/Slack/DC |
+| Scaling logic | `app.py` → `analyze_scaling()` | ROAS/CPC/CTR trends |
+| Anomaly detection | `app.py` → `detect_anomalies()` | Z-score method |
+| Fatigue detection | `app.py` → `fatigue_all()` / `fatigue_single()` | CTR drop analysis |
+| DB schema | `models.py` → `init_db()` | 13 tables, WAL mode |
+| Config | `config.py` | .env file loader |
 
 ### Verification Log
 | Date | Agent | Action | Notes |
 |------|-------|--------|-------|
-| 2026-05-14 | OpenClaw | Initial analysis | Mapped 40+ endpoints from frontend JS chunks |
-| 2026-05-14 | OpenClaw | Full backend | Implemented all 43 API endpoints, 10 SQLite tables, FB API integration, rules engine, team management, Telegram, AdsGPT chat |
-| 2026-05-14 | OpenClaw | Bug fix | Fixed sqlite3.Row .get() bug, tested all 43 endpoints |
-| 2026-05-15 | OpenClaw | Handoff update | Comprehensive rewrite of HANDOFF.md with full flow diagram, all endpoints documented, priority list for next agent |
+| 2026-05-14 | OpenClaw | Initial build | 43 API endpoints, 10 tables |
+| 2026-05-14 | OpenClaw | Bug fix | sqlite3.Row .get() bug |
+| 2026-05-15 | OpenClaw | v2.0 — Full feature build | +9 features, +3 tables, +30 endpoints, production files |
+| 2026-05-15 | OpenClaw | Tests | 67/67 endpoints passing |
 
 ---
 
 ## ⚠️ Known Issues & Gotchas
 
-1. **Passwords stored in plaintext** — MUST fix before production
-2. **`app.secret_key` hardcoded** — should be from env variable
-3. **No CSRF protection** — add before any public deployment
-4. **FB token stored in users table** — consider separate secure storage
-5. **Auto-login first user** — convenient for dev, remove for production
-6. **No error logging framework** — print() only
-7. **SQLite** — fine for single-server, migrate to Postgres for scale
+1. **Passwords stored in plaintext** — MUST hash before production
+2. **No CSRF protection** — add before public deployment
+3. **Auto-login first user** — convenient for dev, remove for production
+4. **SQLite** — fine for single-server, migrate to Postgres for scale
+5. **FB API errors return 200** — wrapped in JSON `{"error": "..."}` not HTTP status
