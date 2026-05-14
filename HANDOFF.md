@@ -173,6 +173,7 @@ facebook-ad-scaler/
 | 2026-05-14 | OpenClaw | v1.0 | 43 endpoints, 10 tables |
 | 2026-05-15 | OpenClaw | v2.0 | +9 features, +30 endpoints, production files |
 | 2026-05-15 | OpenClaw | v2.1 | Password hashing, OAuth, scheduler, rate limiting, CORS, gunicorn, migrations — 79/79 tests |
+| 2026-05-15 01:30 | OpenClaw | v2.1 re-verify | Clone fresh, pip install, server start → **79/79 passed** ✅ |
 
 ---
 
