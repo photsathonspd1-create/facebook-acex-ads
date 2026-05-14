@@ -8,13 +8,13 @@
 - **Facebook Marketing API** — จัดการ campaigns, ad sets, ads, insights ครบ
 - **Smart Scaling** — วิเคราะห์ ROAS/CPC/CTR trend แล้วแนะนำ + execute การ scale อัตโนมัติ
 - **Kill Switch** — ปิดทันทีทุก campaign ที่ขาดทุนเกิน threshold
-- **Auto-Rules Engine** — ตั้งกฎอัตโนมัติ (conditions → actions) พร้อม conflict detection
-- **AdsGPT** — AI chat ช่วยวิเคราะห์โฆษณา (OpenAI integration + fallback)
+- **Auto-Rules Engine** — ตั้งกฎอัตโนมัติ พร้อม background scheduler รันตาม schedule
+- **AdsGPT** — AI chat ช่วยวิเคราะห์โฆษณา (OpenAI streaming + fallback)
 
 ### Analytics
 - **Creative Fatigue Detection** — ตรวจจับ ad ที่ CTR ลด 30%+ ใน 3 วัน
-- **Anomaly Detection** — แจ้งเตือนเมื่อ metrics ผิดปกติ (±2 std dev)
-- **Budget Pacing** — ดูว่าวันนี้ใช้งบไปเท่าไหร่ เทียบกับเป้า
+- **Anomaly Detection** — แจ้งเตือนเมื่อ metrics ผิดปกติ (Z-score, ±2 std dev)
+- **Budget Pacing** — ดูว่าวันนี้ใช้ไปเท่าไหร่ เทียบกับเป้า
 - **Budget Calendar** — ดูประวัติเปลี่ยนงบ + ผลลัพธ์
 - **A/B Test Tracker** — ทำ experiment เปรียบเทียบ ad sets
 
@@ -23,6 +23,14 @@
 - **Team Management** — invite, roles, permissions
 - **Notifications** — Telegram, Slack, Discord webhooks
 - **Audit Trail** — ทุก action มี log + undo
+
+### Security & Production
+- **Password Hashing** — werkzeug.security (pbkdf2)
+- **Rate Limiting** — login: 5/60s, API: 100/60s
+- **CORS** — configurable via environment
+- **DB Migrations** — schema versioning system
+- **Gunicorn** — production WSGI server
+- **Docker** — container deployment ready
 
 ## Quick Start
 
@@ -34,7 +42,7 @@ cd facebook-ad-scaler
 # Install
 pip install -r requirements.txt
 
-# Configure (optional)
+# Configure
 cp .env.example .env
 # Edit .env with your settings
 
@@ -50,79 +58,56 @@ docker build -t ad-scaler .
 docker run -p 8080:8080 -v ad-scaler-data:/data ad-scaler
 ```
 
-## Configuration
+## Production
 
-Copy `.env.example` to `.env` and configure:
+```bash
+pip install -r requirements.txt gunicorn
+./start.sh  # auto-detects gunicorn, falls back to Flask
+```
+
+## Configuration
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `SECRET_KEY` | `change-me` | Flask secret key |
 | `DB_PATH` | `scaler.db` | SQLite database path |
 | `OPENAI_API_KEY` | _(empty)_ | OpenAI API key for AdsGPT |
-| `OPENAI_MODEL` | `gpt-4o-mini` | OpenAI model to use |
+| `OPENAI_MODEL` | `gpt-4o-mini` | OpenAI model |
+| `FB_APP_ID` | _(empty)_ | Facebook OAuth App ID |
+| `FB_APP_SECRET` | _(empty)_ | Facebook OAuth App Secret |
+| `CORS_ORIGINS` | `*` | Allowed CORS origins |
 | `PORT` | `8080` | Server port |
 | `LOG_LEVEL` | `INFO` | Logging level |
 
-## API Endpoints (70+)
+## API Endpoints (80+)
 
-| Category | Endpoints | Description |
-|----------|-----------|-------------|
-| Auth | 5 | Login, register, session management |
-| Facebook API | 18 | Campaigns, ad sets, ads, insights, pacing |
+| Category | Count | Description |
+|----------|-------|-------------|
+| Auth | 7 | Login, register, OAuth, session |
+| Facebook API | 18 | Campaigns, insights, pacing, fatigue |
 | Smart Scaling | 5 | Config, analyze, execute, kill switch |
-| Rules Engine | 11 | CRUD, conflicts, import/export, emergency |
+| Rules + Scheduler | 13 | CRUD, schedule, manual run, history |
 | AdsGPT | 5 | Chat, conversations, settings |
 | Experiments | 5 | A/B test tracker |
-| Anomaly Detection | 1 | Statistical anomaly detection |
-| Fatigue Detection | 2 | Creative fatigue analysis |
-| Budget Calendar | 1 | Budget change history |
-| Bot Actions | 3 | Audit trail with undo |
-| Team | 7 | Members, invites, roles |
 | Notifications | 6 | Telegram, Slack, Discord |
-| Tracking | 2 | Errors, pageviews |
-| System | 3 | Health, announcements, post booster |
+| Team | 7 | Members, invites, roles |
+| System | 5 | Health, tracking, announcements |
+
+## Testing
+
+```bash
+python test_endpoints.py
+# 📊 Results: 79/79 passed, 0 failed
+```
 
 ## Architecture
 
 ```
 Browser → Flask (app.py) → SQLite (models.py)
-                ↓
-        Facebook Marketing API
-        OpenAI API (optional)
-        Telegram / Slack / Discord
-```
-
-## Testing
-
-```bash
-# Start the server
-python app.py &
-
-# Run tests
-python test_endpoints.py
-
-# Or test against a different URL
-python test_endpoints.py https://your-deployed-url.com
-```
-
-## File Structure
-
-```
-facebook-ad-scaler/
-├── app.py              # Flask app — 70+ API endpoints
-├── models.py           # SQLite schema (13 tables)
-├── ai_service.py       # OpenAI integration + fallback
-├── config.py           # Environment-based configuration
-├── test_endpoints.py   # Endpoint test suite
-├── requirements.txt    # Python dependencies
-├── Dockerfile          # Container deployment
-├── .env.example        # Environment template
-├── .gitignore
-├── HANDOFF.md          # Agent handoff documentation
-├── templates/
-│   └── index.html      # React SPA entry point
-└── static/
-    └── assets/         # Pre-built React chunks
+                ↓               ↑
+        Facebook API      scheduler.py
+        OpenAI API        (background)
+        TG/Slack/DC
 ```
 
 ## License

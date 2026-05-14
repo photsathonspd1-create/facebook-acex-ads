@@ -3,6 +3,7 @@ Facebook Ad Scaler — Flask Backend
 All 50+ API endpoints with proper error handling, logging, and input validation.
 """
 from flask import Flask, render_template, send_from_directory, jsonify, request, session, Response
+from werkzeug.security import generate_password_hash, check_password_hash
 import os
 import json
 import sqlite3
@@ -10,6 +11,8 @@ import logging
 import models
 import config
 import ai_service
+import scheduler
+import migrations
 from datetime import datetime, timedelta
 from functools import wraps
 from math import sqrt
@@ -27,6 +30,57 @@ logger = logging.getLogger('scaler')
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
 app.secret_key = config.SECRET_KEY
+
+# ─── Rate Limiting (in-memory) ───
+
+_rate_store = {}  # key -> [timestamps]
+
+def rate_limit(max_calls, window_seconds):
+    """Decorator: rate limit by IP address."""
+    def decorator(f):
+        @wraps(f)
+        def decorated(*args, **kwargs):
+            key = f"{request.remote_addr}:{f.__name__}"
+            now = datetime.utcnow().timestamp()
+            window_start = now - window_seconds
+
+            if key not in _rate_store:
+                _rate_store[key] = []
+
+            # Clean old entries
+            _rate_store[key] = [t for t in _rate_store[key] if t > window_start]
+
+            if len(_rate_store[key]) >= max_calls:
+                retry_after = int(_rate_store[key][0] + window_seconds - now) + 1
+                return jsonify({"error": "Too many requests", "retry_after": retry_after}), 429
+
+            _rate_store[key].append(now)
+            return f(*args, **kwargs)
+        return decorated
+    return decorator
+
+# ─── CORS ───
+
+@app.after_request
+def add_cors_headers(response):
+    """Add CORS headers to all responses."""
+    cors_origins = os.environ.get('CORS_ORIGINS', '*')
+    origin = request.headers.get('Origin', '')
+    if cors_origins == '*':
+        response.headers['Access-Control-Allow-Origin'] = '*'
+    elif origin in cors_origins.split(','):
+        response.headers['Access-Control-Allow-Origin'] = origin
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS, PATCH'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With'
+    response.headers['Access-Control-Allow-Credentials'] = 'true'
+    response.headers['Access-Control-Max-Age'] = '3600'
+    return response
+
+@app.before_request
+def handle_preflight():
+    """Handle CORS preflight OPTIONS requests."""
+    if request.method == 'OPTIONS':
+        return '', 204
 
 # ─── Helpers ───
 
@@ -139,9 +193,10 @@ def register():
             return jsonify({"error": "Password must be at least 6 characters"}), 400
         if '@' not in data['email']:
             return jsonify({"error": "Invalid email format"}), 400
+        hashed = generate_password_hash(data['password'])
         with models.db_conn() as db:
             db.execute("INSERT INTO users (email, password, name) VALUES (?, ?, ?)",
-                       (data['email'], data['password'], data['name']))
+                       (data['email'], hashed, data['name']))
         return jsonify({"ok": True})
     except sqlite3.IntegrityError:
         return jsonify({"error": "Email already registered"}), 400
@@ -150,23 +205,38 @@ def register():
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/auth/login', methods=['POST'])
+@rate_limit(5, 60)
 def login():
     try:
         data = request.json
         if not data or not data.get('email') or not data.get('password'):
             return jsonify({"error": "Missing email or password"}), 400
         with models.db_conn() as db:
-            row = db.execute("SELECT * FROM users WHERE email = ? AND password = ?",
-                              (data['email'], data['password'])).fetchone()
+            row = db.execute("SELECT * FROM users WHERE email = ?",
+                              (data['email'],)).fetchone()
         if row:
             user = dict(row)
-            session['user_id'] = user['id']
-            return jsonify({"ok": True, "user": {
-                "id": user['id'],
-                "name": user['name'],
-                "email": user['email'],
-                "role": user.get('role', 'admin')
-            }})
+            password_valid = False
+            # werkzeug hashed passwords contain ':' (e.g. scrypt:..., pbkdf2:...)
+            if ':' in user['password'] and len(user['password']) > 20:
+                password_valid = check_password_hash(user['password'], data['password'])
+            else:
+                # Legacy plaintext password — check and migrate
+                if user['password'] == data['password']:
+                    password_valid = True
+                    # Migrate to hashed password
+                    hashed = generate_password_hash(data['password'])
+                    with models.db_conn() as db:
+                        db.execute("UPDATE users SET password = ? WHERE id = ?",
+                                   (hashed, user['id']))
+            if password_valid:
+                session['user_id'] = user['id']
+                return jsonify({"ok": True, "user": {
+                    "id": user['id'],
+                    "name": user['name'],
+                    "email": user['email'],
+                    "role": user.get('role', 'admin')
+                }})
         return jsonify({"error": "Invalid credentials"}), 401
     except Exception as e:
         logger.error(f"login error: {e}")
@@ -179,7 +249,85 @@ def logout():
 
 @app.route('/api/auth/facebook', methods=['GET'])
 def auth_facebook():
-    return jsonify({"error": "Facebook OAuth not configured yet"}), 501
+    """Initiate Facebook OAuth2 flow."""
+    fb_app_id = os.environ.get('FB_APP_ID', '')
+    fb_redirect_uri = os.environ.get('FB_REDIRECT_URI', '')
+    if not fb_app_id or not fb_redirect_uri:
+        return jsonify({"error": "Facebook OAuth not configured. Set FB_APP_ID, FB_APP_SECRET, and FB_REDIRECT_URI in your .env file."}), 501
+    scope = 'email,public_profile,ads_management,ads_read'
+    fb_auth_url = (
+        f"https://www.facebook.com/{config.FB_API_VERSION}/dialog/oauth?"
+        f"client_id={fb_app_id}&redirect_uri={fb_redirect_uri}&scope={scope}&response_type=code"
+    )
+    return jsonify({"redirect_url": fb_auth_url})
+
+@app.route('/api/auth/facebook/callback', methods=['GET'])
+def auth_facebook_callback():
+    """Handle Facebook OAuth2 callback."""
+    try:
+        code = request.args.get('code')
+        if not code:
+            return jsonify({"error": "Missing authorization code"}), 400
+
+        fb_app_id = os.environ.get('FB_APP_ID', '')
+        fb_app_secret = os.environ.get('FB_APP_SECRET', '')
+        fb_redirect_uri = os.environ.get('FB_REDIRECT_URI', '')
+
+        if not fb_app_id or not fb_app_secret:
+            return jsonify({"error": "Facebook OAuth not configured"}), 500
+
+        import requests as req
+
+        # Exchange code for access token
+        token_resp = req.get(
+            f"https://graph.facebook.com/{config.FB_API_VERSION}/oauth/access_token",
+            params={
+                'client_id': fb_app_id,
+                'client_secret': fb_app_secret,
+                'redirect_uri': fb_redirect_uri,
+                'code': code,
+            },
+            timeout=15,
+        )
+        token_data = token_resp.json()
+        if 'error' in token_data:
+            return jsonify({"error": f"Token exchange failed: {token_data['error'].get('message', 'Unknown error')}"}), 400
+
+        access_token = token_data.get('access_token')
+        if not access_token:
+            return jsonify({"error": "No access token received"}), 400
+
+        # Get user info from Facebook
+        user_resp = req.get(
+            f"https://graph.facebook.com/{config.FB_API_VERSION}/me",
+            params={'fields': 'id,name,email', 'access_token': access_token},
+            timeout=15,
+        )
+        fb_user = user_resp.json()
+        if 'error' in fb_user:
+            return jsonify({"error": f"Failed to get user info: {fb_user['error'].get('message', '')}"}), 400
+
+        fb_email = fb_user.get('email', f"fb_{fb_user['id']}@facebook.local")
+        fb_name = fb_user.get('name', 'Facebook User')
+
+        # Create or find user
+        with models.db_conn() as db:
+            existing = db.execute("SELECT * FROM users WHERE email = ?", (fb_email,)).fetchone()
+            if existing:
+                user_id = existing['id']
+                db.execute("UPDATE users SET fb_token = ? WHERE id = ?", (access_token, user_id))
+            else:
+                cursor = db.execute(
+                    "INSERT INTO users (email, password, name, fb_token) VALUES (?, ?, ?, ?)",
+                    (fb_email, generate_password_hash(os.urandom(16).hex()), fb_name, access_token)
+                )
+                user_id = cursor.lastrowid
+
+        session['user_id'] = user_id
+        return jsonify({"ok": True, "user": {"id": user_id, "name": fb_name, "email": fb_email}})
+    except Exception as e:
+        logger.error(f"auth_facebook_callback error: {e}")
+        return jsonify({"error": str(e)}), 500
 
 # ─── Settings API ───
 
@@ -2098,6 +2246,67 @@ def preview_rule(user):
         logger.error(f"preview_rule error: {e}")
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/rules/<int:rule_id>/run', methods=['POST'])
+@require_auth
+def run_rule_now(user, rule_id):
+    """Manually trigger a rule immediately."""
+    try:
+        with models.db_conn() as db:
+            rule = db.execute("SELECT * FROM rules WHERE id = ? AND user_id = ?",
+                              (rule_id, user['id'])).fetchone()
+        if not rule:
+            return jsonify({"error": "Rule not found"}), 404
+
+        results = scheduler.run_rule(rule_id)
+        return jsonify({"ok": True, "results": results or []})
+    except Exception as e:
+        logger.error(f"run_rule_now error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/rules/<int:rule_id>/history', methods=['GET'])
+@require_auth
+def rule_history(user, rule_id):
+    """Get rule execution history from bot_actions."""
+    try:
+        with models.db_conn() as db:
+            rule = db.execute("SELECT * FROM rules WHERE id = ? AND user_id = ?",
+                              (rule_id, user['id'])).fetchone()
+            if not rule:
+                return jsonify({"error": "Rule not found"}), 404
+
+            rows = db.execute(
+                """SELECT * FROM bot_actions
+                   WHERE rule_id = ? AND user_id = ?
+                   ORDER BY created_at DESC LIMIT 50""",
+                (rule_id, user['id'])
+            ).fetchall()
+
+        history = [{
+            "id": r['id'],
+            "action_type": r['action_type'],
+            "target_type": r['target_type'],
+            "target_id": r['target_id'],
+            "target_name": r['target_name'],
+            "details": json.loads(r['details']) if r['details'] else {},
+            "created_at": r['created_at'],
+        } for r in rows]
+
+        return jsonify({"history": history, "rule_id": rule_id})
+    except Exception as e:
+        logger.error(f"rule_history error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/scheduler/status', methods=['GET'])
+@require_auth
+def scheduler_status(user):
+    """Get scheduler status and next runs."""
+    try:
+        status = scheduler.get_status()
+        return jsonify(status)
+    except Exception as e:
+        logger.error(f"scheduler_status error: {e}")
+        return jsonify({"error": str(e)}), 500
+
 # ─── Bot Actions API ───
 
 @app.route('/api/bot/actions', methods=['GET'])
@@ -2484,5 +2693,10 @@ def internal_error(e):
     return jsonify({"error": "Internal server error"}), 500
 
 if __name__ == "__main__":
+    migrations.run_migrations()
     logger.info(f"🚀 Facebook Ad Scaler v2.0 running at http://{config.HOST}:{config.PORT}")
-    app.run(host=config.HOST, port=config.PORT, debug=config.DEBUG)
+    scheduler.start()
+    try:
+        app.run(host=config.HOST, port=config.PORT, debug=config.DEBUG)
+    finally:
+        scheduler.stop()

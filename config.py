@@ -26,6 +26,12 @@ DB_PATH = os.environ.get('DB_PATH', 'scaler.db')
 
 # Facebook
 FB_API_VERSION = os.environ.get('FB_API_VERSION', 'v19.0')
+FB_APP_ID = os.environ.get('FB_APP_ID', '')
+FB_APP_SECRET = os.environ.get('FB_APP_SECRET', '')
+FB_REDIRECT_URI = os.environ.get('FB_REDIRECT_URI', '')
+
+# CORS
+CORS_ORIGINS = os.environ.get('CORS_ORIGINS', '*')
 
 # OpenAI
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')

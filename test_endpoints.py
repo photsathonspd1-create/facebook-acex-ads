@@ -190,6 +190,61 @@ def main():
     test("GET", "/api/announcements/active", expect_status=200, label="Announcements")
     test("POST", "/api/ai/post-booster/123", data={"text": "test"}, expect_status=[200, 400], label="AI post booster")
 
+    # ── New Features: Password Hashing ──
+    print("\n🔐 Password Hashing")
+    test("POST", "/api/auth/register", data={"email": "hash@test.com", "password": "secure123", "name": "Hash Test"}, expect_status=200, label="Register (hashed)")
+    test("POST", "/api/auth/login", data={"email": "hash@test.com", "password": "secure123"}, expect_status=200, label="Login (hashed)")
+    test("POST", "/api/auth/login", data={"email": "hash@test.com", "password": "wrongpass"}, expect_status=401, label="Login wrong password")
+
+    # ── New Features: Facebook OAuth ──
+    print("\n📱 Facebook OAuth")
+    test("GET", "/api/auth/facebook", expect_status=[200, 501], label="Facebook OAuth (config-dependent)")
+    test("GET", "/api/auth/facebook/callback", expect_status=[400, 500], label="Facebook OAuth callback (no code)")
+
+    # ── New Features: Scheduler ──
+    print("\n⏰ Scheduler")
+    test("GET", "/api/scheduler/status", expect_status=200, label="Scheduler status")
+    # Create a rule first, then test run
+    test("POST", "/api/rules", data={"name": "Scheduler Test Rule", "conditions": [], "actions": [{"type": "notify", "message": "test"}]}, expect_status=200, label="Create rule for scheduler")
+    test("POST", "/api/rules/2/run", expect_status=[200, 404], label="Manual rule run")
+    test("GET", "/api/rules/2/history", expect_status=[200, 404], label="Rule history")
+
+    # ── New Features: Rate Limiting ──
+    print("\n🚦 Rate Limiting")
+    # Rate limiting is tested implicitly — login has rate limit of 5/60s
+    # We've already done 3 logins above, so this should still work
+    test("POST", "/api/auth/login", data={"email": "test@test.com", "password": "test123"}, expect_status=[200, 401], label="Login (rate limit OK)")
+
+    # ── New Features: CORS ──
+    print("\n🌐 CORS")
+    # Test that CORS headers are present on a regular request
+    try:
+        r = session.get(f"{BASE_URL}/api/health", timeout=10)
+        cors_header = r.headers.get('Access-Control-Allow-Origin', '')
+        if cors_header:
+            print(f"  ✅ CORS headers present — {cors_header}")
+            passed += 1
+        else:
+            print(f"  ❌ CORS headers missing")
+            failed += 1
+            errors.append("CORS headers missing")
+    except Exception as e:
+        print(f"  ❌ CORS test — {e}")
+        failed += 1
+
+    # Test OPTIONS preflight
+    try:
+        r = session.options(f"{BASE_URL}/api/health", timeout=10)
+        if r.status_code in (200, 204):
+            print(f"  ✅ OPTIONS preflight — {r.status_code}")
+            passed += 1
+        else:
+            print(f"  ❌ OPTIONS preflight — {r.status_code}")
+            failed += 1
+    except Exception as e:
+        print(f"  ❌ OPTIONS preflight — {e}")
+        failed += 1
+
     # ── Summary ──
     total = passed + failed
     print(f"\n{'='*50}")

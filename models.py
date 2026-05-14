@@ -205,6 +205,15 @@ def init_db():
             )
         """)
 
+        # Schema version tracking
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS schema_version (
+                version INTEGER PRIMARY KEY,
+                description TEXT,
+                applied_at TEXT DEFAULT (datetime('now'))
+            )
+        """)
+
         db.commit()
 
 init_db()
