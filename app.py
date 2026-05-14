@@ -161,6 +161,10 @@ def safe_float(val, default=0.0):
 def index():
     return render_template('index.html')
 
+@app.route('/guide')
+def guide():
+    return render_template('guide.html')
+
 @app.route('/assets/<path:path>')
 def send_assets(path):
     return send_from_directory('static/assets', path)
