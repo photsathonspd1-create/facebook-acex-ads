@@ -4,7 +4,7 @@
 
 **Facebook Ad Scaler** — เครื่องมือจัดการและ scale โฆษณา Facebook อัตโนมัติ
 
-- **Repo:** https://github.com/photsathonspd1-create/facebook-ad-scaler
+- **Repo:** https://github.com/dmz2001TH/facebook-ad-scaler
 - **Tech Stack:** Flask + SQLite + Pre-built React Frontend (static assets)
 - **Frontend:** Pre-built React SPA (harvested from Cloudflare Pages), served as static files
 - **Font:** Kanit (Thai/English)
