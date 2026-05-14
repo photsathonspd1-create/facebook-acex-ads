@@ -16,91 +16,12 @@
   </head>
   <body>
     <div id="root"></div>
+    <!-- Auto-reload script disabled — was causing flickering on localhost -->
+    <!-- Re-enable for production deploy with CDN -->
     <script>
-      // Auto-reload safety net for stale-tab × new-deploy.
-      //
-      // What goes wrong:
-      //   1. A new deploy mints fresh asset hashes.
-      //   2. CF purges the old hashed files.
-      //   3. An open tab still has the old HTML referencing old hashes.
-      //   4. Old HTML's <script src="assets/index-OLD.js"> hits a 404.
-      //      With the /assets/[[catchall]] function we ship with this
-      //      build, the 404 is now a real 404 (not the HTML fallback)
-      //      so the browser fires `error` on the <script>/<link>.
-      //   5. That fires our handler below → we reload to the fresh HTML.
-      //
-      // This handler also catches dynamic-import failures from React.lazy
-      // chunks (ProposalCard, AdsGPT, etc.) via `unhandledrejection`.
-      //
-      // Guard strategy: a 5-second cooldown on sessionStorage avoids both
-      // the infinite-reload loop AND the no-second-chance trap (the old
-      // session-only guard could leave a user permanently stuck if the
-      // first reload's `load` event never fired).
-      var GUARD_KEY = '__asset_reload__';
-      var GUARD_MS = 5000;
-
-      function showReloadNotice() {
-        try {
-          document.documentElement.style.background = '#0f0f14';
-          document.body.innerHTML =
-            '<div style="display:flex;align-items:center;justify-content:center;' +
-            'min-height:100vh;color:#a0a0b0;font-family:sans-serif;font-size:14px;">' +
-            '🔄 อัพเดทระบบ — กำลังโหลดใหม่...</div>';
-        } catch (_) {}
-      }
-
-      function shouldReload() {
-        try {
-          var prev = parseInt(sessionStorage.getItem(GUARD_KEY) || '0', 10);
-          if (prev && Date.now() - prev < GUARD_MS) return false;
-          sessionStorage.setItem(GUARD_KEY, String(Date.now()));
-          return true;
-        } catch (_) {
-          return true;
-        }
-      }
-
-      function triggerReload() {
-        if (!shouldReload()) return;
-        showReloadNotice();
-        window.location.reload();
-      }
-
-      function isAssetUrl(s) {
-        return typeof s === 'string' && /\/assets\//.test(s);
-      }
-
-      // <script>/<link> element-level errors (MIME mismatch, 404 from
-      // /assets/[[catchall]] function, network blip). Capture mode so we
-      // see element-targeted errors before React's listeners.
-      window.addEventListener('error', function (e) {
-        var t = e.target;
-        if (t && (t.tagName === 'SCRIPT' || t.tagName === 'LINK')) {
-          var url = t.src || t.href || '';
-          if (isAssetUrl(url)) {
-            if (e.preventDefault) e.preventDefault();
-            if (e.stopImmediatePropagation) e.stopImmediatePropagation();
-            triggerReload();
-          }
-        }
-      }, true);
-
-      // Dynamic-import chunk failures land in an unhandled rejection. Vite
-      // emits messages like "Failed to fetch dynamically imported module:
-      // https://…/assets/AdsGPT-xyz.js" — match on the asset path.
-      window.addEventListener('unhandledrejection', function (e) {
-        var msg = e && e.reason ? String(e.reason.message || e.reason) : '';
-        if (isAssetUrl(msg) || /dynamically imported module/i.test(msg)) {
-          if (e.preventDefault) e.preventDefault();
-          triggerReload();
-        }
-      });
-
-      // Clear the guard once the page successfully loads its bundle, so
-      // a future stale-tab event in the SAME session can still reload.
-      window.addEventListener('load', function () {
-        try { sessionStorage.removeItem(GUARD_KEY); } catch (_) {}
-      });
+      // Disabled: auto-reload safety net
+      // var GUARD_KEY = '__asset_reload__';
+      // ... (disabled to fix flickering issue on local/dev)
     </script>
   </body>
 </html>
