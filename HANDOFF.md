@@ -174,6 +174,7 @@ facebook-ad-scaler/
 | 2026-05-15 | OpenClaw | v2.0 | +9 features, +30 endpoints, production files |
 | 2026-05-15 | OpenClaw | v2.1 | Password hashing, OAuth, scheduler, rate limiting, CORS, gunicorn, migrations — 79/79 tests |
 | 2026-05-15 01:30 | OpenClaw | v2.1 re-verify | Clone fresh, pip install, server start → **79/79 passed** ✅ |
+| 2026-05-15 01:47 | OpenClaw | v2.2 | **Fix: SPA catch-all route** — all pages return 200 (was 404 for non-/ routes). Fixed page flickering. 79/79 tests ✅ |
 
 ---
 
@@ -183,3 +184,10 @@ facebook-ad-scaler/
 2. **Auto-login first user** — remove for multi-user production
 3. **In-memory rate limiter** — resets on restart (use Redis for distributed)
 4. **FB OAuth** — needs App ID/Secret to activate
+5. **Auto-reload script disabled** — was causing flickering on localhost. Re-enable for production CDN deploy (see `templates/index.html`)
+
+## 🐛 Bug Fixes Applied
+
+| Date | Issue | Fix | Commit |
+|------|-------|-----|--------|
+| 2026-05-15 | Page flickering on all non-/ routes | Added SPA catch-all route + disabled auto-reload script | `8f50dd6` |
