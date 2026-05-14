@@ -15,20 +15,20 @@ def get_current_user():
     user_id = session.get('user_id')
     if user_id:
         with models.db_conn() as db:
-            user = db.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
-            if user:
-                return dict(user)
+            row = db.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+            if row:
+                return dict(row)
     # Fallback: auto-login first user
     with models.db_conn() as db:
-        user = db.execute("SELECT * FROM users LIMIT 1").fetchone()
-        if user:
-            return dict(user)
+        row = db.execute("SELECT * FROM users LIMIT 1").fetchone()
+        if row:
+            return dict(row)
     return None
 
 def get_fb_token():
     """Get FB token from current user."""
     user = get_current_user()
-    if user and user.get('fb_token'):
+    if user and user['fb_token']:
         return user['fb_token']
     return None
 
@@ -111,9 +111,10 @@ def login():
     if not data or not data.get('email') or not data.get('password'):
         return jsonify({"error": "Missing email or password"}), 400
     with models.db_conn() as db:
-        user = db.execute("SELECT * FROM users WHERE email = ? AND password = ?",
+        row = db.execute("SELECT * FROM users WHERE email = ? AND password = ?",
                           (data['email'], data['password'])).fetchone()
-    if user:
+    if row:
+        user = dict(row)
         session['user_id'] = user['id']
         return jsonify({"ok": True, "user": {
             "id": user['id'],
