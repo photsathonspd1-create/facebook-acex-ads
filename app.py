@@ -169,6 +169,15 @@ def guide():
 def send_assets(path):
     return send_from_directory('static/assets', path)
 
+# SPA catch-all: serve index.html for all non-API, non-static routes
+# This allows React Router to handle client-side routing
+@app.route('/<path:path>')
+def spa_catchall(path):
+    # Don't intercept API routes or static files
+    if path.startswith('api/') or path.startswith('assets/'):
+        return jsonify({"error": "Not found"}), 404
+    return render_template('index.html')
+
 # ─── Auth API ───
 
 @app.route('/api/auth/me', methods=['GET'])
