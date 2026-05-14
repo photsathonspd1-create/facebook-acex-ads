@@ -1,4 +1,4 @@
-# 📘 คู่มือการใช้งาน Facebook Ad Scaler
+# 📘 คู่มือการใช้งาน Acex Ads
 
 > คู่มือฉบับเต็มสำหรับผู้ใช้งาน — ตั้งแต่เริ่มต้นจนใช้งานจริง
 
@@ -31,8 +31,8 @@
 
 ```bash
 # 1. Clone โปรเจค
-git clone https://github.com/dmz2001TH/facebook-ad-scaler.git
-cd facebook-ad-scaler
+git clone https://github.com/dmz2001TH/facebook-acex-ads.git
+cd facebook-acex-ads
 
 # 2. ติดตั้ง dependencies
 pip install -r requirements.txt
@@ -52,8 +52,8 @@ python app.py
 ### ติดตั้งด้วย Docker
 
 ```bash
-docker build -t ad-scaler .
-docker run -p 8080:8080 -v ad-scaler-data:/data ad-scaler
+docker build -t acex-ads .
+docker run -p 8080:8080 -v acex-ads-data:/data acex-ads
 ```
 
 ### ติดตั้งแบบ Production
@@ -96,7 +96,7 @@ pip install -r requirements.txt gunicorn
 
 ### ขั้นตอนที่ 4: ใส่ Token ในระบบ
 
-1. เปิด Ad Scaler → ไปที่ **Settings**
+1. เปิด Acex Ads → ไปที่ **Settings**
 2. วาง Facebook Access Token ในช่อง **FB Token**
 3. กด **Save**
 
@@ -594,16 +594,16 @@ python3 -c "import secrets; print(secrets.token_hex(32))"
 
 ```bash
 # Build
-docker build -t ad-scaler .
+docker build -t acex-ads .
 
 # Run
 docker run -d \
-  --name ad-scaler \
+  --name acex-ads \
   -p 8080:8080 \
-  -v ad-scaler-data:/data \
+  -v acex-ads-data:/data \
   -e SECRET_KEY=your-secret-key \
   -e OPENAI_API_KEY=sk-your-key \
-  ad-scaler
+  acex-ads
 ```
 
 ### ด้วย Gunicorn (บน VPS)
@@ -622,19 +622,19 @@ nano .env
 
 ### ด้วย systemd (รันเป็น service)
 
-สร้างไฟล์ `/etc/systemd/system/ad-scaler.service`:
+สร้างไฟล์ `/etc/systemd/system/acex-ads.service`:
 
 ```ini
 [Unit]
-Description=Facebook Ad Scaler
+Description=Acex Ads
 After=network.target
 
 [Service]
 Type=simple
 User=www-data
-WorkingDirectory=/opt/facebook-ad-scaler
-EnvironmentFile=/opt/facebook-ad-scaler/.env
-ExecStart=/opt/facebook-ad-scaler/start.sh
+WorkingDirectory=/opt/facebook-acex-ads
+EnvironmentFile=/opt/facebook-acex-ads/.env
+ExecStart=/opt/facebook-acex-ads/start.sh
 Restart=always
 RestartSec=5
 
@@ -643,9 +643,9 @@ WantedBy=multi-user.target
 ```
 
 ```bash
-sudo systemctl enable ad-scaler
-sudo systemctl start ad-scaler
-sudo systemctl status ad-scaler
+sudo systemctl enable acex-ads
+sudo systemctl start acex-ads
+sudo systemctl status acex-ads
 ```
 
 ### Reverse Proxy (Nginx)
@@ -701,7 +701,7 @@ cp scaler.db scaler_backup_$(date +%Y%m%d).db
 
 ## 📞 ต้องการความช่วยเหลือ?
 
-- **GitHub Issues:** https://github.com/dmz2001TH/facebook-ad-scaler/issues
+- **GitHub Issues:** https://github.com/dmz2001TH/facebook-acex-ads/issues
 - **API Documentation:** ดู `HANDOFF.md` สำหรับรายการ endpoints ทั้งหมด
 
 ---

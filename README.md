@@ -1,4 +1,4 @@
-# Facebook Ad Scaler
+# Acex Ads
 
 เครื่องมือจัดการและ scale โฆษณา Facebook อัตโนมัติ ด้วย AI
 
@@ -54,8 +54,8 @@ python app.py
 ## Docker
 
 ```bash
-docker build -t ad-scaler .
-docker run -p 8080:8080 -v ad-scaler-data:/data ad-scaler
+docker build -t acex-ads .
+docker run -p 8080:8080 -v acex-ads-data:/data acex-ads
 ```
 
 ## Production

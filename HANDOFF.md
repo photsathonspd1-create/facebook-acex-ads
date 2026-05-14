@@ -1,12 +1,12 @@
-# HANDOFF.md — Facebook Ad Scaler
+# HANDOFF.md — Acex Ads
 
 > **⚠️ อัปเดตทุกครั้งที่มีการเปลี่ยนแปลง — นี่คือ single source of truth สำหรับ agent ถัดไป**
 
 ## 📌 Project Overview
 
-**Facebook Ad Scaler** — เครื่องมือจัดการและ scale โฆษณา Facebook อัตโนมัติ ด้วย AI
+**Acex Ads** — เครื่องมือจัดการและ scale โฆษณา Facebook อัตโนมัติ ด้วย AI
 
-- **Repo:** https://github.com/dmz2001TH/facebook-ad-scaler
+- **Repo:** https://github.com/dmz2001TH/facebook-acex-ads
 - **Tech Stack:** Flask + SQLite + OpenAI + React Frontend (static)
 - **Port:** 8080
 - **Branch:** `master`
@@ -106,8 +106,8 @@ pip install -r requirements.txt gunicorn
 ./start.sh            # auto-detects gunicorn
 
 # Docker
-docker build -t ad-scaler .
-docker run -p 8080:8080 -v ad-scaler-data:/data ad-scaler
+docker build -t acex-ads .
+docker run -p 8080:8080 -v acex-ads-data:/data acex-ads
 
 # Tests
 python test_endpoints.py  # 79/79 ✅
@@ -118,7 +118,7 @@ python test_endpoints.py  # 79/79 ✅
 ## 📁 File Structure
 
 ```
-facebook-ad-scaler/
+facebook-acex-ads/
 ├── app.py              # Flask app — 80+ API endpoints (~2700 lines)
 ├── models.py           # SQLite schema (14 tables)
 ├── ai_service.py       # OpenAI integration + fallback

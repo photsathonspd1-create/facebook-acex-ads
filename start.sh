@@ -1,5 +1,5 @@
 #!/bin/bash
-# Facebook Ad Scaler — Production startup script
+# Acex Ads — Production startup script
 # Uses gunicorn if available, falls back to Flask dev server
 
 set -e

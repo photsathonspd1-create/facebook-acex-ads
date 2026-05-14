@@ -1,5 +1,5 @@
 """
-Facebook Ad Scaler — Flask Backend
+Acex Ads — Flask Backend
 All 50+ API endpoints with proper error handling, logging, and input validation.
 """
 from flask import Flask, render_template, send_from_directory, jsonify, request, session, Response
@@ -1635,16 +1635,16 @@ def test_webhook(user):
         if ch_type == 'slack':
             payload = {
                 "blocks": [
-                    {"type": "header", "text": {"type": "plain_text", "text": "🧪 Ad Scaler Test"}},
+                    {"type": "header", "text": {"type": "plain_text", "text": "🧪 Acex Ads Test"}},
                     {"type": "section", "text": {"type": "mrkdwn",
-                        "text": "Test message from *Facebook Ad Scaler*.\nNotifications are working! ✅"}},
+                        "text": "Test message from *Acex Ads*.\nNotifications are working! ✅"}},
                 ]
             }
         elif ch_type == 'discord':
             payload = {
                 "embeds": [{
-                    "title": "🧪 Ad Scaler Test",
-                    "description": "Test message from **Facebook Ad Scaler**.\nNotifications are working! ✅",
+                    "title": "🧪 Acex Ads Test",
+                    "description": "Test message from **Acex Ads**.\nNotifications are working! ✅",
                     "color": 5814783,
                 }]
             }
@@ -1659,7 +1659,7 @@ def test_webhook(user):
         logger.error(f"test_webhook error: {e}")
         return jsonify({"error": str(e)}), 500
 
-def send_notification(user_id: int, message: str, title: str = "Ad Scaler Alert"):
+def send_notification(user_id: int, message: str, title: str = "Acex Ads Alert"):
     """Send notification to all connected channels for a user."""
     import requests as req
 
@@ -2572,7 +2572,7 @@ def telegram_test_send(user):
         import requests as req
         resp = req.post(
             f"https://api.telegram.org/bot{conn['bot_token']}/sendMessage",
-            json={"chat_id": conn['chat_id'], "text": "🧪 Test message from Ad Scaler!"},
+            json={"chat_id": conn['chat_id'], "text": "🧪 Test message from Acex Ads!"},
             timeout=10
         )
         if resp.status_code == 200:
@@ -2707,7 +2707,7 @@ def internal_error(e):
 
 if __name__ == "__main__":
     migrations.run_migrations()
-    logger.info(f"🚀 Facebook Ad Scaler v2.0 running at http://{config.HOST}:{config.PORT}")
+    logger.info(f"🚀 Acex Ads v2.0 running at http://{config.HOST}:{config.PORT}")
     scheduler.start()
     try:
         app.run(host=config.HOST, port=config.PORT, debug=config.DEBUG)

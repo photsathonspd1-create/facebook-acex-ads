@@ -1,4 +1,4 @@
-"""Gunicorn production configuration for Facebook Ad Scaler."""
+"""Gunicorn production configuration for Acex Ads."""
 import multiprocessing
 
 # Server socket
@@ -20,7 +20,7 @@ errorlog = "-"
 loglevel = "info"
 
 # Process naming
-proc_name = "ad-scaler"
+proc_name = "acex-ads"
 
 # Server mechanics
 max_requests = 1000
