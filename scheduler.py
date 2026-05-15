@@ -7,6 +7,7 @@ import json
 import logging
 import models
 from datetime import datetime
+import app as flask_app  # Import app to use its fb_api and other helpers
 
 logger = logging.getLogger('scaler.scheduler')
 
@@ -46,7 +47,7 @@ def check_condition(condition, campaign_data):
     return False
 
 
-def execute_action(action, user_id, rule_id, rule_name):
+def execute_action(action, user_id, rule_id, rule_name, target_id=None):
     """Execute a single rule action. Returns result dict."""
     action_type = action.get('type', '')
     result = {"action": action_type, "status": "executed"}
@@ -55,25 +56,53 @@ def execute_action(action, user_id, rule_id, rule_name):
         # Log to bot_actions
         with models.db_conn() as db:
             db.execute(
-                """INSERT INTO bot_actions (user_id, rule_id, action_type, target_type, target_name, details)
-                   VALUES (?, ?, ?, ?, ?, ?)""",
-                (user_id, rule_id, f"rule_{action_type}", "rule", rule_name,
+                """INSERT INTO bot_actions (user_id, rule_id, action_type, target_type, target_id, target_name, details)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                (user_id, rule_id, f"rule_{action_type}", "campaign", target_id, rule_name,
                  json.dumps(action))
             )
 
         if action_type == 'notify':
             result["message"] = action.get('message', f'Rule "{rule_name}" triggered')
-            # Notification will be picked up by the app's send_notification
         elif action_type == 'pause_campaign':
-            result["note"] = "Campaign pause queued (requires FB API call from app)"
+            if target_id:
+                # Real FB API call to pause campaign
+                resp = flask_app.fb_api(f"{target_id}", method='POST', data={"status": "PAUSED"})
+                if 'error' in resp:
+                    result["status"] = "error"
+                    result["error"] = resp['error']
+                else:
+                    result["status"] = "success"
+            else:
+                result["status"] = "error"
+                result["error"] = "No campaign ID provided"
         elif action_type == 'adjust_budget':
             change_pct = action.get('change_pct', 0)
-            result["change_pct"] = change_pct
-            result["note"] = f"Budget adjustment of {change_pct}% queued"
+            if target_id and change_pct:
+                # 1. Fetch current budget
+                camp = flask_app.fb_api(f"{target_id}", params={"fields": "daily_budget,lifetime_budget"})
+                if 'error' in camp:
+                    result["status"] = "error"
+                    result["error"] = camp['error']
+                else:
+                    budget = float(camp.get('daily_budget', camp.get('lifetime_budget', 0)))
+                    new_budget = int(budget * (1 + change_pct / 100))
+                    # 2. Update budget
+                    budget_key = 'daily_budget' if 'daily_budget' in camp else 'lifetime_budget'
+                    resp = flask_app.fb_api(f"{target_id}", method='POST', data={budget_key: new_budget})
+                    if 'error' in resp:
+                        result["status"] = "error"
+                        result["error"] = resp['error']
+                    else:
+                        result["status"] = "success"
+                        result["new_budget"] = new_budget
+            else:
+                result["status"] = "error"
+                result["error"] = "Target ID or percentage missing"
         else:
-            result["note"] = f"Unknown action type: {action_type}"
+            result["status"] = "error"
+            result["error"] = f"Unknown action type: {action_type}"
 
-        result["status"] = "success"
     except Exception as e:
         logger.error(f"execute_action error: {e}")
         result["status"] = "error"
@@ -97,22 +126,55 @@ def run_rule(rule_id):
         conditions = json.loads(rule['conditions']) if rule['conditions'] else []
         actions = json.loads(rule['actions']) if rule['actions'] else []
         user_id = rule['user_id']
+        account_id = rule['account_id']
 
-        # For each condition, evaluate against a simulated/default data source
-        # In production, this would fetch real FB data per campaign
+        if not account_id:
+            logger.warning(f"Rule {rule_id} has no account_id")
+            return
+
+        # Fetch real FB metrics for the account/campaigns
+        target_campaign_id = None
+        for cond in conditions:
+            if cond.get('campaign_id'):
+                target_campaign_id = cond['campaign_id']
+                break
+        
+        endpoint = f"{target_campaign_id}/insights" if target_campaign_id else f"{account_id}/insights"
+        params = {"date_preset": "today", "fields": "cpc,cpm,ctr,spend,actions"}
+        
+        resp = flask_app.fb_api(endpoint, params=params)
+        
+        if 'error' in resp or not resp.get('data'):
+            logger.error(f"Failed to fetch insights for rule {rule_id}: {resp.get('error', 'No data')}")
+            return
+
+        # Extract metrics
+        insights = resp['data'][0]
+        campaign_data = {
+            "cpc": float(insights.get('cpc', 0)),
+            "cpm": float(insights.get('cpm', 0)),
+            "ctr": float(insights.get('ctr', 0)),
+            "spend": float(insights.get('spend', 0)),
+        }
+        # Add ROAS if possible
+        actions_list = insights.get('actions', [])
+        purchase_val = sum(float(a.get('value', 0)) for a in actions_list if a.get('action_type') == 'purchase')
+        if campaign_data['spend'] > 0:
+            campaign_data['roas'] = purchase_val / campaign_data['spend']
+        else:
+            campaign_data['roas'] = 0
+
+        # Evaluate conditions
         conditions_met = True
-        campaign_data = {}  # Would be populated from FB API in production
-
         for cond in conditions:
             if not check_condition(cond, campaign_data):
                 conditions_met = False
                 break
 
-        # If no conditions defined, treat as manual-trigger-only (still execute)
         results = []
         if conditions_met or not conditions:
             for action in actions:
-                result = execute_action(action, user_id, rule_id, rule['name'])
+                result = execute_action(action, user_id, rule_id, rule['name'], target_id=target_campaign_id or account_id)
                 results.append(result)
 
         # Update rule last_run and run_count
@@ -159,11 +221,13 @@ def _scheduler_tick():
                 should_run = True
             else:
                 try:
-                    last_dt = datetime.fromisoformat(last_run)
+                    last_run_clean = last_run.replace(' ', 'T')
+                    last_dt = datetime.fromisoformat(last_run_clean)
                     diff = (datetime.utcnow() - last_dt).total_seconds() / 60
                     if diff >= interval_minutes:
                         should_run = True
-                except (ValueError, TypeError):
+                except (ValueError, TypeError) as e:
+                    logger.error(f"Error parsing last_run {last_run}: {e}")
                     should_run = True
 
             if should_run:
@@ -173,7 +237,8 @@ def _scheduler_tick():
             else:
                 if last_run:
                     try:
-                        last_dt = datetime.fromisoformat(last_run)
+                        last_run_clean = last_run.replace(' ', 'T')
+                        last_dt = datetime.fromisoformat(last_run_clean)
                         next_dt = last_dt.timestamp() + interval_minutes * 60
                         remaining = (next_dt - datetime.utcnow().timestamp()) / 60
                         if remaining > 0:

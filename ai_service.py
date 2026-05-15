@@ -90,13 +90,13 @@ def _build_context(fb_data: dict = None) -> str:
 def generate_response(message: str, history: list = None, fb_data: dict = None) -> str:
     """Generate AI response. Uses OpenAI if configured, otherwise falls back."""
     api_key = config.OPENAI_API_KEY
-    if not api_key:
+    if not api_key or not api_key.startswith("sk-") or len(api_key) < 20:
         logger.info("No OpenAI API key configured, using fallback responses")
         return _get_fallback(message)
 
     try:
         import openai
-        client = openai.OpenAI(api_key=api_key)
+        client = openai.OpenAI(api_key=api_key, timeout=5.0)
 
         messages = [{"role": "system", "content": SYSTEM_PROMPT}]
         context = _build_context(fb_data)
@@ -130,13 +130,13 @@ def generate_response(message: str, history: list = None, fb_data: dict = None) 
 def generate_response_stream(message: str, history: list = None, fb_data: dict = None):
     """Generator for streaming responses via SSE."""
     api_key = config.OPENAI_API_KEY
-    if not api_key:
+    if not api_key or not api_key.startswith("sk-") or len(api_key) < 20:
         yield f"data: {json.dumps({'content': _get_fallback(message), 'done': True})}\n\n"
         return
 
     try:
         import openai
-        client = openai.OpenAI(api_key=api_key)
+        client = openai.OpenAI(api_key=api_key, timeout=5.0)
 
         messages = [{"role": "system", "content": SYSTEM_PROMPT}]
         context = _build_context(fb_data)

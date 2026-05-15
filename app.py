@@ -87,12 +87,13 @@ def handle_preflight():
 def get_current_user():
     """Get current logged-in user from session or auto-login first user."""
     try:
+        # BYPASS LOGIN FOR USER
+        with models.db_conn() as db:
+            row = db.execute("SELECT * FROM users WHERE email = 'admin@test.com'").fetchone()
+            if row:
+                return dict(row)
+        
         user_id = session.get('user_id')
-        if user_id:
-            with models.db_conn() as db:
-                row = db.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
-                if row:
-                    return dict(row)
         with models.db_conn() as db:
             row = db.execute("SELECT * FROM users LIMIT 1").fetchone()
             if row:
@@ -167,15 +168,16 @@ def guide():
 
 @app.route('/assets/<path:path>')
 def send_assets(path):
-    return send_from_directory('static/assets', path)
+    return send_from_directory(os.path.join(app.root_path, 'static', 'assets'), path)
 
 # SPA catch-all: serve index.html for all non-API, non-static routes
 # This allows React Router to handle client-side routing
 @app.route('/<path:path>')
 def spa_catchall(path):
-    # Don't intercept API routes or static files
-    if path.startswith('api/') or path.startswith('assets/'):
-        return jsonify({"error": "Not found"}), 404
+    # Don't intercept API routes
+    if path.startswith('api/'):
+        return jsonify({"error": "API route not found"}), 404
+    # For everything else, serve index.html (React handles the rest)
     return render_template('index.html')
 
 # ─── Auth API ───
@@ -263,10 +265,10 @@ def logout():
 @app.route('/api/auth/facebook', methods=['GET'])
 def auth_facebook():
     """Initiate Facebook OAuth2 flow."""
-    fb_app_id = os.environ.get('FB_APP_ID', '')
-    fb_redirect_uri = os.environ.get('FB_REDIRECT_URI', '')
+    fb_app_id = config.FB_APP_ID
+    fb_redirect_uri = config.FB_REDIRECT_URI
     if not fb_app_id or not fb_redirect_uri:
-        return jsonify({"error": "Facebook OAuth not configured. Set FB_APP_ID, FB_APP_SECRET, and FB_REDIRECT_URI in your .env file."}), 501
+        return jsonify({"error": "Facebook OAuth not configured"}), 501
     scope = 'email,public_profile,ads_management,ads_read'
     fb_auth_url = (
         f"https://www.facebook.com/{config.FB_API_VERSION}/dialog/oauth?"
