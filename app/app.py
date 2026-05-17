@@ -13,6 +13,7 @@ import config
 import ai_service
 import scheduler
 import migrations
+import crypto
 from datetime import datetime, timedelta
 from functools import wraps
 from math import sqrt
@@ -30,6 +31,32 @@ logger = logging.getLogger('scaler')
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
 app.secret_key = config.SECRET_KEY
+
+# Session security
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+if not config.DEBUG:
+    app.config['SESSION_COOKIE_SECURE'] = True
+
+# ─── Rate Limiting (in-memory, per-IP) ───
+from collections import defaultdict
+import time as _time
+
+_rate_limits = defaultdict(list)  # ip -> [timestamp, ...]
+RATE_LIMIT_LOGIN_MAX = 5         # max attempts
+RATE_LIMIT_LOGIN_WINDOW = 300    # 5 minutes
+
+
+def _check_rate_limit(ip, endpoint, max_hits, window_sec):
+    """Return True if rate limit exceeded."""
+    now = _time.time()
+    key = f"{ip}:{endpoint}"
+    # Prune old entries
+    _rate_limits[key] = [t for t in _rate_limits[key] if now - t < window_sec]
+    if len(_rate_limits[key]) >= max_hits:
+        return True
+    _rate_limits[key].append(now)
+    return False
 
 # ─── CORS ───
 
@@ -57,17 +84,13 @@ def handle_preflight():
 # ─── Helpers ───
 
 def get_current_user():
-    """Get current logged-in user from session or auto-login first user."""
+    """Get current logged-in user from session only. No bypass."""
     try:
-        # BYPASS LOGIN FOR USER
-        with models.db_conn() as db:
-            row = db.execute("SELECT * FROM users WHERE email = 'admin@test.com'").fetchone()
-            if row:
-                return dict(row)
-        
         user_id = session.get('user_id')
+        if not user_id:
+            return None
         with models.db_conn() as db:
-            row = db.execute("SELECT * FROM users LIMIT 1").fetchone()
+            row = db.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
             if row:
                 return dict(row)
     except Exception as e:
@@ -77,7 +100,7 @@ def get_current_user():
 def get_fb_token():
     user = get_current_user()
     if user and user.get('fb_token'):
-        return user['fb_token']
+        return crypto.decrypt(user['fb_token'])
     return None
 
 def fb_api(endpoint, params=None, method='GET', data=None):
@@ -176,14 +199,19 @@ def register():
         data = request.json
         if not data or not data.get('email') or not data.get('password') or not data.get('name'):
             return jsonify({"error": "Missing required fields (email, password, name)"}), 400
-        if len(data['password']) < 6:
+        email = data['email'].strip().lower()
+        name = data['name'].strip()
+        password = data['password']
+        if len(password) < 6:
             return jsonify({"error": "Password must be at least 6 characters"}), 400
-        if '@' not in data['email']:
+        if len(name) < 1 or len(name) > 100:
+            return jsonify({"error": "Name must be 1-100 characters"}), 400
+        if '@' not in email or len(email) > 254:
             return jsonify({"error": "Invalid email format"}), 400
-        hashed = generate_password_hash(data['password'])
+        hashed = generate_password_hash(password)
         with models.db_conn() as db:
             db.execute("INSERT INTO users (email, password, name) VALUES (?, ?, ?)",
-                       (data['email'], hashed, data['name']))
+                       (email, hashed, name))
         return jsonify({"ok": True})
     except sqlite3.IntegrityError:
         return jsonify({"error": "Email already registered"}), 400
@@ -194,12 +222,18 @@ def register():
 @app.route('/api/auth/login', methods=['POST'])
 def login():
     try:
+        # Rate limit login attempts per IP
+        client_ip = request.headers.get('X-Forwarded-For', request.remote_addr).split(',')[0].strip()
+        if _check_rate_limit(client_ip, 'login', RATE_LIMIT_LOGIN_MAX, RATE_LIMIT_LOGIN_WINDOW):
+            return jsonify({"error": "Too many login attempts. Try again later."}), 429
+
         data = request.json
         if not data or not data.get('email') or not data.get('password'):
             return jsonify({"error": "Missing email or password"}), 400
+        email = data['email'].strip().lower()
         with models.db_conn() as db:
             row = db.execute("SELECT * FROM users WHERE email = ?",
-                              (data['email'],)).fetchone()
+                              (email,)).fetchone()
         if row:
             user = dict(row)
             password_valid = False
@@ -208,7 +242,9 @@ def login():
                 password_valid = check_password_hash(user['password'], data['password'])
             else:
                 # Legacy plaintext password — check and migrate
-                if user['password'] == data['password']:
+                # Use hmac.compare_digest for constant-time comparison
+                import hmac
+                if hmac.compare_digest(user['password'], data['password']):
                     password_valid = True
                     # Migrate to hashed password
                     hashed = generate_password_hash(data['password'])
@@ -301,11 +337,11 @@ def auth_facebook_callback():
             existing = db.execute("SELECT * FROM users WHERE email = ?", (fb_email,)).fetchone()
             if existing:
                 user_id = existing['id']
-                db.execute("UPDATE users SET fb_token = ? WHERE id = ?", (access_token, user_id))
+                db.execute("UPDATE users SET fb_token = ? WHERE id = ?", (crypto.encrypt(access_token), user_id))
             else:
                 cursor = db.execute(
                     "INSERT INTO users (email, password, name, fb_token) VALUES (?, ?, ?, ?)",
-                    (fb_email, generate_password_hash(os.urandom(16).hex()), fb_name, access_token)
+                    (fb_email, generate_password_hash(os.urandom(16).hex()), fb_name, crypto.encrypt(access_token))
                 )
                 user_id = cursor.lastrowid
 
@@ -325,8 +361,9 @@ def save_token(user):
         token = (data or {}).get('token', '')
         if not isinstance(token, str):
             return jsonify({"error": "Token must be a string"}), 400
+        encrypted = crypto.encrypt(token) if token else token
         with models.db_conn() as db:
-            db.execute("UPDATE users SET fb_token = ? WHERE id = ?", (token, user['id']))
+            db.execute("UPDATE users SET fb_token = ? WHERE id = ?", (encrypted, user['id']))
         return jsonify({"ok": True})
     except Exception as e:
         logger.error(f"save_token error: {e}")
@@ -1580,7 +1617,7 @@ def connect_webhook(user):
         with models.db_conn() as db:
             db.execute(
                 "INSERT INTO notification_channels (user_id, channel_type, webhook_url, name) VALUES (?, ?, ?, ?)",
-                (user['id'], webhook_type, webhook_url, name or f"{webhook_type.capitalize()} Webhook")
+                (user['id'], webhook_type, crypto.encrypt(webhook_url), name or f"{webhook_type.capitalize()} Webhook")
             )
         return jsonify({"ok": True})
     except Exception as e:
@@ -1603,7 +1640,7 @@ def test_webhook(user):
 
         import requests as req
         ch_type = channel['channel_type']
-        url = channel['webhook_url']
+        url = crypto.decrypt(channel['webhook_url'])
 
         if ch_type == 'slack':
             payload = {
@@ -1645,8 +1682,9 @@ def send_notification(user_id: int, message: str, title: str = "Acex Ads Alert")
             ).fetchall()
         for conn in tg:
             try:
+                bot_token = crypto.decrypt(conn['bot_token'])
                 req.post(
-                    f"https://api.telegram.org/bot{conn['bot_token']}/sendMessage",
+                    f"https://api.telegram.org/bot{bot_token}/sendMessage",
                     json={"chat_id": conn['chat_id'], "text": f"📢 {title}\n\n{message}", "parse_mode": "Markdown"},
                     timeout=10
                 )
@@ -1681,7 +1719,7 @@ def send_notification(user_id: int, message: str, title: str = "Acex Ads Alert")
                     }
                 else:
                     continue
-                req.post(ch['webhook_url'], json=payload, timeout=10)
+                req.post(crypto.decrypt(ch['webhook_url']), json=payload, timeout=10)
             except Exception as e:
                 logger.error(f"Webhook send error ({ch['channel_type']}): {e}")
     except Exception:
@@ -2512,7 +2550,7 @@ def telegram_connect(user):
                        (user['id'], account_id))
             db.execute("""INSERT INTO telegram_connections (user_id, account_id, chat_id, bot_token, connected)
                           VALUES (?, ?, ?, ?, 1)""",
-                       (user['id'], account_id, chat_id, bot_token))
+                       (user['id'], account_id, chat_id, crypto.encrypt(bot_token)))
         return jsonify({"ok": True})
     except Exception as e:
         logger.error(f"telegram_connect error: {e}")
@@ -2543,8 +2581,9 @@ def telegram_test_send(user):
         if not conn:
             return jsonify({"error": "Telegram not connected"}), 400
         import requests as req
+        bot_token = crypto.decrypt(conn['bot_token'])
         resp = req.post(
-            f"https://api.telegram.org/bot{conn['bot_token']}/sendMessage",
+            f"https://api.telegram.org/bot{bot_token}/sendMessage",
             json={"chat_id": conn['chat_id'], "text": "🧪 Test message from Acex Ads!"},
             timeout=10
         )
@@ -2664,29 +2703,6 @@ def health():
     return jsonify({"status": "ok", "version": "2.0.0", "timestamp": datetime.now().isoformat()})
 
 # ─── Error Handlers ───
-
-@app.errorhandler(404)
-def not_found(e):
-    return jsonify({"error": "Not found"}), 404
-
-@app.errorhandler(405)
-def method_not_allowed(e):
-    return jsonify({"error": "Method not allowed"}), 405
-
-@app.errorhandler(500)
-def internal_error(e):
-    logger.error(f"Internal server error: {e}")
-    return jsonify({"error": "Internal server error"}), 500
-
-if __name__ == "__main__":
-    migrations.run_migrations()
-    logger.info(f"🚀 Acex Ads v2.0 running at http://{config.HOST}:{config.PORT}")
-    scheduler.start()
-    try:
-        app.run(host=config.HOST, port=config.PORT, debug=config.DEBUG)
-    finally:
-        scheduler.stop()
-
 
 @app.errorhandler(404)
 def not_found(e):

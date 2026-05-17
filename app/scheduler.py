@@ -7,7 +7,6 @@ import json
 import logging
 import models
 from datetime import datetime
-import app as flask_app  # Import app to use its fb_api and other helpers
 
 logger = logging.getLogger('scaler.scheduler')
 
@@ -47,6 +46,12 @@ def check_condition(condition, campaign_data):
     return False
 
 
+def _fb_api(*args, **kwargs):
+    """Lazy import to avoid circular dependency with app module."""
+    from app import fb_api
+    return fb_api(*args, **kwargs)
+
+
 def execute_action(action, user_id, rule_id, rule_name, target_id=None):
     """Execute a single rule action. Returns result dict."""
     action_type = action.get('type', '')
@@ -66,8 +71,7 @@ def execute_action(action, user_id, rule_id, rule_name, target_id=None):
             result["message"] = action.get('message', f'Rule "{rule_name}" triggered')
         elif action_type == 'pause_campaign':
             if target_id:
-                # Real FB API call to pause campaign
-                resp = flask_app.fb_api(f"{target_id}", method='POST', data={"status": "PAUSED"})
+                resp = _fb_api(f"{target_id}", method='POST', data={"status": "PAUSED"})
                 if 'error' in resp:
                     result["status"] = "error"
                     result["error"] = resp['error']
@@ -79,17 +83,15 @@ def execute_action(action, user_id, rule_id, rule_name, target_id=None):
         elif action_type == 'adjust_budget':
             change_pct = action.get('change_pct', 0)
             if target_id and change_pct:
-                # 1. Fetch current budget
-                camp = flask_app.fb_api(f"{target_id}", params={"fields": "daily_budget,lifetime_budget"})
+                camp = _fb_api(f"{target_id}", params={"fields": "daily_budget,lifetime_budget"})
                 if 'error' in camp:
                     result["status"] = "error"
                     result["error"] = camp['error']
                 else:
                     budget = float(camp.get('daily_budget', camp.get('lifetime_budget', 0)))
                     new_budget = int(budget * (1 + change_pct / 100))
-                    # 2. Update budget
                     budget_key = 'daily_budget' if 'daily_budget' in camp else 'lifetime_budget'
-                    resp = flask_app.fb_api(f"{target_id}", method='POST', data={budget_key: new_budget})
+                    resp = _fb_api(f"{target_id}", method='POST', data={budget_key: new_budget})
                     if 'error' in resp:
                         result["status"] = "error"
                         result["error"] = resp['error']
@@ -142,7 +144,7 @@ def run_rule(rule_id):
         endpoint = f"{target_campaign_id}/insights" if target_campaign_id else f"{account_id}/insights"
         params = {"date_preset": "today", "fields": "cpc,cpm,ctr,spend,actions"}
         
-        resp = flask_app.fb_api(endpoint, params=params)
+        resp = _fb_api(endpoint, params=params)
         
         if 'error' in resp or not resp.get('data'):
             logger.error(f"Failed to fetch insights for rule {rule_id}: {resp.get('error', 'No data')}")
