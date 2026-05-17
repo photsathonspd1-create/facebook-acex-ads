@@ -27,9 +27,10 @@ if [ ! -f ".env" ]; then
     echo "⚙️  Creating .env from .env.example..."
     cp .env.example .env
     # Generate a random secret key
-    SECRET=$(python3 -c "import secrets; print(secrets.token_hex(32)")
+    SECRET=$(python3 -c "import secrets; print(secrets.token_hex(32))")
     sed -i "s/change-me-to-a-random-string/$SECRET/" .env
-    sed -i "s/^ENCRYPTION_KEY=$/ENCRYPTION_KEY=$(python3 -c 'import secrets; print(secrets.token_hex(32))')/" .env
+    ENC_KEY=$(python3 -c "import secrets; print(secrets.token_hex(32))")
+    sed -i "s/^ENCRYPTION_KEY=$/ENCRYPTION_KEY=$ENC_KEY/" .env
     echo "✅ .env created with random keys"
 fi
 
