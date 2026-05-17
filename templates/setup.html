@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Acex Ads — Setup</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&display=swap" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Kanit', sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; }
+    .container { max-width: 640px; margin: 0 auto; padding: 40px 24px; }
+    h1 { font-size: 1.8rem; background: linear-gradient(135deg, #3b82f6, #8b5cf6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 8px; }
+    .subtitle { color: #94a3b8; margin-bottom: 32px; }
+    .section { background: #1e293b; border-radius: 12px; padding: 24px; margin-bottom: 20px; border: 1px solid #334155; }
+    .section h2 { font-size: 1.1rem; color: #e2e8f0; margin-bottom: 4px; }
+    .section p { font-size: 0.85rem; color: #64748b; margin-bottom: 16px; }
+    label { display: block; font-size: 0.85rem; color: #94a3b8; margin-bottom: 6px; margin-top: 12px; }
+    label:first-of-type { margin-top: 0; }
+    input, select { width: 100%; padding: 10px 14px; background: #0f172a; border: 1px solid #334155; border-radius: 8px; color: #e2e8f0; font-family: inherit; font-size: 0.9rem; outline: none; transition: border-color 0.2s; }
+    input:focus, select:focus { border-color: #3b82f6; }
+    input::placeholder { color: #475569; }
+    .hint { font-size: 0.75rem; color: #475569; margin-top: 4px; }
+    .btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 24px; border-radius: 8px; border: none; font-family: inherit; font-size: 0.9rem; font-weight: 500; cursor: pointer; transition: all 0.2s; }
+    .btn-primary { background: #3b82f6; color: white; }
+    .btn-primary:hover { background: #2563eb; }
+    .btn-success { background: #22c55e; color: white; }
+    .btn-success:hover { background: #16a34a; }
+    .btn-ghost { background: transparent; color: #94a3b8; border: 1px solid #334155; }
+    .btn-ghost:hover { background: #1e293b; color: #e2e8f0; }
+    .actions { display: flex; gap: 12px; margin-top: 20px; }
+    .status { padding: 10px 16px; border-radius: 8px; font-size: 0.85rem; margin-top: 12px; display: none; }
+    .status.ok { display: block; background: #22c55e20; color: #22c55e; border: 1px solid #22c55e40; }
+    .status.err { display: block; background: #ef444420; color: #ef4444; border: 1px solid #ef444440; }
+    .step-num { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; background: #3b82f6; color: white; font-size: 0.8rem; font-weight: 600; margin-right: 10px; }
+    .back { display: inline-block; margin-bottom: 24px; color: #60a5fa; text-decoration: none; font-size: 0.9rem; }
+    .back:hover { text-decoration: underline; }
+    .badge { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 500; }
+    .badge-ok { background: #22c55e20; color: #22c55e; }
+    .badge-warn { background: #f59e0b20; color: #f59e0b; }
+    .divider { border: none; border-top: 1px solid #334155; margin: 24px 0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <a href="/" class="back">← กลับหน้าหลัก</a>
+    <h1>⚙️ Acex Ads Setup</h1>
+    <p class="subtitle">ตั้งค่าระบบก่อนเริ่มใช้งาน — กรอกข้อมูลแล้วกดบันทึก</p>
+
+    <!-- Step 1: Facebook OAuth -->
+    <div class="section">
+      <h2><span class="step-num">1</span> Facebook OAuth</h2>
+      <p>ตั้งค่า Facebook App เพื่อเชื่อมต่อบัญชีโฆษณา</p>
+
+      <label>Facebook App ID</label>
+      <input type="text" id="fb_app_id" placeholder="123456789012345" />
+      <div class="hint">จาก <a href="https://developers.facebook.com/apps" target="_blank" style="color:#60a5fa">developers.facebook.com</a> → App Settings → Basic</div>
+
+      <label>Facebook App Secret</label>
+      <input type="password" id="fb_app_secret" placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" />
+      <div class="hint">จาก App Settings → Basic → Show App Secret</div>
+
+      <label>Redirect URI</label>
+      <input type="text" id="fb_redirect_uri" placeholder="https://yourdomain.com/api/auth/facebook/callback" />
+      <div class="hint">ต้องตรงกับที่ตั้งค่าใน Facebook App → Facebook Login → Settings</div>
+
+      <label>API Version</label>
+      <select id="fb_api_version">
+        <option value="v19.0">v19.0 (แนะนำ)</option>
+        <option value="v18.0">v18.0</option>
+        <option value="v21.0">v21.0</option>
+        <option value="v22.0">v22.0</option>
+      </select>
+
+      <div id="fb_status" class="status"></div>
+
+      <div class="actions">
+        <button class="btn btn-primary" onclick="saveFacebook()">💾 บันทึกการตั้งค่า</button>
+        <button class="btn btn-ghost" onclick="testFacebook()">🔗 ทดสอบเชื่อมต่อ</button>
+      </div>
+    </div>
+
+    <!-- Step 2: OpenAI -->
+    <div class="section">
+      <h2><span class="step-num">2</span> OpenAI API (AdsGPT)</h2>
+      <p>ตั้งค่า OpenAI เพื่อใช้ AI Chatbot วิเคราะห์โฆษณา</p>
+
+      <label>OpenAI API Key</label>
+      <input type="password" id="openai_key" placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" />
+      <div class="hint">จาก <a href="https://platform.openai.com/api-keys" target="_blank" style="color:#60a5fa">platform.openai.com</a> → API Keys</div>
+
+      <div id="openai_status" class="status"></div>
+
+      <div class="actions">
+        <button class="btn btn-primary" onclick="saveOpenAI()">💾 บันทึก API Key</button>
+        <button class="btn btn-ghost" onclick="testOpenAI()">🧪 ทดสอบ</button>
+      </div>
+    </div>
+
+    <!-- Step 3: Quick Test -->
+    <div class="section">
+      <h2><span class="step-num">3</span> ทดสอบระบบ</h2>
+      <p>ตรวจสอบว่าทุกอย่างทำงานถูกต้อง</p>
+
+      <div id="system_checks" style="margin-top:12px"></div>
+
+      <div class="actions">
+        <button class="btn btn-success" onclick="runChecks()">🚀 ตรวจสอบทั้งหมด</button>
+      </div>
+    </div>
+
+    <hr class="divider" />
+
+    <div style="text-align:center; color:#475569; font-size:0.8rem;">
+      Acex Ads v2.0 — Facebook Ad Management System
+    </div>
+  </div>
+
+  <script>
+    const API = '';
+
+    async function api(path, opts = {}) {
+      const resp = await fetch(API + path, {
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        ...opts,
+      });
+      return resp.json();
+    }
+
+    function showStatus(id, ok, msg) {
+      const el = document.getElementById(id);
+      el.className = 'status ' + (ok ? 'ok' : 'err');
+      el.textContent = msg;
+    }
+
+    // Load current settings
+    async function loadSettings() {
+      try {
+        const fb = await api('/api/settings/facebook-oauth');
+        if (fb.fb_app_id) document.getElementById('fb_app_id').value = fb.fb_app_id;
+        if (fb.fb_redirect_uri) document.getElementById('fb_redirect_uri').value = fb.fb_redirect_uri;
+        if (fb.fb_api_version) document.getElementById('fb_api_version').value = fb.fb_api_version;
+        if (fb.configured) {
+          showStatus('fb_status', true, '✅ Facebook OAuth ตั้งค่าแล้ว — พร้อมใช้งาน');
+        }
+      } catch {}
+
+      try {
+        const oai = await api('/api/settings/openai');
+        if (oai.has_key) {
+          showStatus('openai_status', true, '✅ OpenAI API Key ตั้งค่าแล้ว');
+        }
+      } catch {}
+    }
+
+    // Save Facebook settings
+    async function saveFacebook() {
+      const data = {
+        fb_app_id: document.getElementById('fb_app_id').value,
+        fb_app_secret: document.getElementById('fb_app_secret').value,
+        fb_redirect_uri: document.getElementById('fb_redirect_uri').value,
+        fb_api_version: document.getElementById('fb_api_version').value,
+      };
+      if (!data.fb_app_id || !data.fb_redirect_uri) {
+        showStatus('fb_status', false, '❌ กรุณากรอก App ID และ Redirect URI');
+        return;
+      }
+      try {
+        const r = await api('/api/settings/facebook-oauth', { method: 'POST', body: JSON.stringify(data) });
+        if (r.ok) {
+          showStatus('fb_status', true, '✅ บันทึกสำเร็จ! กด "ทดสอบเชื่อมต่อ" เพื่อลอง');
+        } else {
+          showStatus('fb_status', false, '❌ ' + (r.error || 'บันทึกไม่สำเร็จ'));
+        }
+      } catch (e) {
+        showStatus('fb_status', false, '❌ เกิดข้อผิดพลาด: ' + e.message);
+      }
+    }
+
+    // Test Facebook connection
+    async function testFacebook() {
+      try {
+        const r = await api('/api/auth/facebook');
+        if (r.redirect_url) {
+          showStatus('fb_status', true, '✅ OAuth URL สร้างสำเร็จ! เปิด redirect URL ได้');
+          if (confirm('ต้องการเปิด Facebook Login ทดสอบเลยมั้ย?\n\n(ต้องมี Facebook App ที่ใช้งานได้จริง)')) {
+            window.location.href = r.redirect_url;
+          }
+        } else {
+          showStatus('fb_status', false, '❌ ' + (r.error || 'ไม่สามารถสร้าง OAuth URL ได้'));
+        }
+      } catch (e) {
+        showStatus('fb_status', false, '❌ ' + e.message);
+      }
+    }
+
+    // Save OpenAI settings
+    async function saveOpenAI() {
+      const key = document.getElementById('openai_key').value;
+      try {
+        const r = await api('/api/settings/openai', { method: 'POST', body: JSON.stringify({ openai_api_key: key }) });
+        if (r.ok) {
+          showStatus('openai_status', true, '✅ บันทึก OpenAI API Key สำเร็จ');
+        } else {
+          showStatus('openai_status', false, '❌ ' + (r.error || 'บันทึกไม่สำเร็จ'));
+        }
+      } catch (e) {
+        showStatus('openai_status', false, '❌ ' + e.message);
+      }
+    }
+
+    // Test OpenAI
+    async function testOpenAI() {
+      try {
+        const r = await api('/api/ads-gpt/chat', {
+          method: 'POST',
+          body: JSON.stringify({ message: 'สวัสดี ทดสอบเชื่อมต่อ' }),
+        });
+        if (r.response) {
+          showStatus('openai_status', true, '✅ AdsGPT ตอบ: ' + r.response.substring(0, 100) + '...');
+        } else {
+          showStatus('openai_status', false, '❌ ' + (r.error || 'ไม่ได้รับคำตอบ'));
+        }
+      } catch (e) {
+        showStatus('openai_status', false, '❌ ' + e.message);
+      }
+    }
+
+    // System checks
+    async function runChecks() {
+      const el = document.getElementById('system_checks');
+      el.innerHTML = '<div style="color:#94a3b8">กำลังตรวจสอบ...</div>';
+
+      const checks = [];
+
+      // 1. Health
+      try {
+        const h = await api('/api/health');
+        checks.push({ name: 'Server', ok: h.status === 'ok', detail: h.status });
+      } catch (e) {
+        checks.push({ name: 'Server', ok: false, detail: e.message });
+      }
+
+      // 2. Auth
+      try {
+        const a = await api('/api/auth/me');
+        checks.push({ name: 'Authentication', ok: !!a.user, detail: a.user ? a.user.email : 'Not logged in' });
+      } catch {
+        checks.push({ name: 'Authentication', ok: false, detail: 'Error' });
+      }
+
+      // 3. Facebook OAuth
+      try {
+        const f = await api('/api/settings/facebook-oauth');
+        checks.push({ name: 'Facebook OAuth', ok: f.configured, detail: f.configured ? 'Configured' : 'Not configured' });
+      } catch {
+        checks.push({ name: 'Facebook OAuth', ok: false, detail: 'Error' });
+      }
+
+      // 4. OpenAI
+      try {
+        const o = await api('/api/settings/openai');
+        checks.push({ name: 'OpenAI (AdsGPT)', ok: o.has_key, detail: o.has_key ? 'Key configured' : 'No key (fallback mode)' });
+      } catch {
+        checks.push({ name: 'OpenAI (AdsGPT)', ok: false, detail: 'Error' });
+      }
+
+      // 5. Scheduler
+      try {
+        const s = await api('/api/scheduler/status');
+        checks.push({ name: 'Scheduler', ok: s.running, detail: s.running ? `Running (${s.total_active} active rules)` : 'Stopped' });
+      } catch {
+        checks.push({ name: 'Scheduler', ok: false, detail: 'Error' });
+      }
+
+      el.innerHTML = checks.map(c => `
+        <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #1e293b">
+          <span style="font-size:1.1rem">${c.ok ? '✅' : '⚠️'}</span>
+          <span style="flex:1;font-size:0.9rem">${c.name}</span>
+          <span class="badge ${c.ok ? 'badge-ok' : 'badge-warn'}">${c.detail}</span>
+        </div>
+      `).join('');
+    }
+
+    // Init
+    loadSettings();
+  </script>
+</body>
+</html>

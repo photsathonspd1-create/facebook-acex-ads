@@ -113,7 +113,8 @@ def fb_api(endpoint, params=None, method='GET', data=None):
     if not token:
         return {"error": "No Facebook token configured. Go to Settings."}
     import requests as req
-    url = f"https://graph.facebook.com/{config.FB_API_VERSION}/{endpoint}"
+    s = _get_fb_oauth_settings()
+    url = f"https://graph.facebook.com/{s['api_version']}/{endpoint}"
     headers = {"Authorization": f"Bearer {token}"}
     try:
         if method == 'GET':
@@ -164,6 +165,10 @@ def index():
 @app.route('/guide')
 def guide():
     return render_template('guide.html')
+
+@app.route('/setup')
+def setup():
+    return render_template('setup.html')
 
 @app.route('/assets/<path:path>')
 def send_assets(path):
@@ -277,14 +282,13 @@ def logout():
 @app.route('/api/auth/facebook', methods=['GET'])
 def auth_facebook():
     """Initiate Facebook OAuth2 flow."""
-    fb_app_id = config.FB_APP_ID
-    fb_redirect_uri = config.FB_REDIRECT_URI
-    if not fb_app_id or not fb_redirect_uri:
-        return jsonify({"error": "Facebook OAuth not configured"}), 501
+    s = _get_fb_oauth_settings()
+    if not s['app_id'] or not s['redirect_uri']:
+        return jsonify({"error": "Facebook OAuth not configured. Go to Settings → Facebook OAuth."}), 501
     scope = 'email,public_profile,ads_management,ads_read'
     fb_auth_url = (
-        f"https://www.facebook.com/{config.FB_API_VERSION}/dialog/oauth?"
-        f"client_id={fb_app_id}&redirect_uri={fb_redirect_uri}&scope={scope}&response_type=code"
+        f"https://www.facebook.com/{s['api_version']}/dialog/oauth?"
+        f"client_id={s['app_id']}&redirect_uri={s['redirect_uri']}&scope={scope}&response_type=code"
     )
     return jsonify({"redirect_url": fb_auth_url})
 
@@ -296,9 +300,11 @@ def auth_facebook_callback():
         if not code:
             return jsonify({"error": "Missing authorization code"}), 400
 
-        fb_app_id = os.environ.get('FB_APP_ID', '')
-        fb_app_secret = os.environ.get('FB_APP_SECRET', '')
-        fb_redirect_uri = os.environ.get('FB_REDIRECT_URI', '')
+        s = _get_fb_oauth_settings()
+        fb_app_id = s['app_id']
+        fb_app_secret = s['app_secret']
+        fb_redirect_uri = s['redirect_uri']
+        fb_api_version = s['api_version']
 
         if not fb_app_id or not fb_app_secret:
             return jsonify({"error": "Facebook OAuth not configured"}), 500
@@ -307,7 +313,7 @@ def auth_facebook_callback():
 
         # Exchange code for access token
         token_resp = req.get(
-            f"https://graph.facebook.com/{config.FB_API_VERSION}/oauth/access_token",
+            f"https://graph.facebook.com/{fb_api_version}/oauth/access_token",
             params={
                 'client_id': fb_app_id,
                 'client_secret': fb_app_secret,
@@ -326,7 +332,7 @@ def auth_facebook_callback():
 
         # Get user info from Facebook
         user_resp = req.get(
-            f"https://graph.facebook.com/{config.FB_API_VERSION}/me",
+            f"https://graph.facebook.com/{fb_api_version}/me",
             params={'fields': 'id,name,email', 'access_token': access_token},
             timeout=15,
         )
@@ -357,6 +363,119 @@ def auth_facebook_callback():
         return jsonify({"error": str(e)}), 500
 
 # ─── Settings API ───
+
+def _get_fb_oauth_settings():
+    """Get Facebook OAuth settings from DB, fallback to env vars."""
+    settings = {'app_id': '', 'app_secret': '', 'redirect_uri': '', 'api_version': config.FB_API_VERSION}
+    try:
+        with models.db_conn() as db:
+            for key in ('fb_app_id', 'fb_app_secret', 'fb_redirect_uri', 'fb_api_version'):
+                row = db.execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone()
+                if row and row['value']:
+                    settings[key.replace('fb_', '')] = row['value']
+    except Exception:
+        pass
+    # Fallback to env vars if DB is empty
+    if not settings['app_id']:
+        settings['app_id'] = config.FB_APP_ID
+    if not settings['app_secret']:
+        settings['app_secret'] = os.environ.get('FB_APP_SECRET', '')
+    if not settings['redirect_uri']:
+        settings['redirect_uri'] = config.FB_REDIRECT_URI
+    if not settings['api_version']:
+        settings['api_version'] = config.FB_API_VERSION
+    return settings
+
+
+@app.route('/api/settings/facebook-oauth', methods=['GET'])
+@require_auth
+def get_facebook_oauth_settings(user):
+    """Get Facebook OAuth configuration."""
+    try:
+        s = _get_fb_oauth_settings()
+        return jsonify({
+            "fb_app_id": s['app_id'],
+            "fb_app_secret": '***' if s['app_secret'] else '',
+            "fb_redirect_uri": s['redirect_uri'],
+            "fb_api_version": s['api_version'],
+            "configured": bool(s['app_id'] and s['app_secret'] and s['redirect_uri']),
+        })
+    except Exception as e:
+        logger.error(f"get_facebook_oauth_settings error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/settings/facebook-oauth', methods=['POST'])
+@require_auth
+def save_facebook_oauth_settings(user):
+    """Save Facebook OAuth configuration."""
+    try:
+        data = request.json
+        if not data:
+            return jsonify({"error": "Settings data required"}), 400
+
+        fb_app_id = data.get('fb_app_id', '').strip()
+        fb_app_secret = data.get('fb_app_secret', '').strip()
+        fb_redirect_uri = data.get('fb_redirect_uri', '').strip()
+        fb_api_version = data.get('fb_api_version', 'v19.0').strip()
+
+        if not fb_app_id:
+            return jsonify({"error": "Facebook App ID required"}), 400
+        if not fb_redirect_uri:
+            return jsonify({"error": "Redirect URI required"}), 400
+
+        with models.db_conn() as db:
+            for key, val in [('fb_app_id', fb_app_id), ('fb_app_secret', fb_app_secret),
+                             ('fb_redirect_uri', fb_redirect_uri), ('fb_api_version', fb_api_version)]:
+                existing = db.execute("SELECT key FROM settings WHERE key = ?", (key,)).fetchone()
+                if existing:
+                    db.execute("UPDATE settings SET value = ? WHERE key = ?", (val, key))
+                else:
+                    # Use user_id = 0 for global settings
+                    db.execute("INSERT INTO settings (user_id, key, value) VALUES (0, ?, ?)", (key, val))
+
+        return jsonify({"ok": True, "message": "Facebook OAuth settings saved"})
+    except Exception as e:
+        logger.error(f"save_facebook_oauth_settings error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/settings/openai', methods=['GET'])
+@require_auth
+def get_openai_settings(user):
+    """Get OpenAI API settings."""
+    try:
+        with models.db_conn() as db:
+            row = db.execute("SELECT value FROM settings WHERE user_id = ? AND key = 'openai_api_key'",
+                             (user['id'],)).fetchone()
+        has_key = bool(row and row['value'])
+        return jsonify({
+            "has_key": has_key,
+            "model": config.OPENAI_MODEL,
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/settings/openai', methods=['POST'])
+@require_auth
+def save_openai_settings(user):
+    """Save OpenAI API key."""
+    try:
+        data = request.json
+        api_key = (data or {}).get('openai_api_key', '').strip()
+        with models.db_conn() as db:
+            existing = db.execute("SELECT key FROM settings WHERE user_id = ? AND key = 'openai_api_key'",
+                                  (user['id'],)).fetchone()
+            if existing:
+                db.execute("UPDATE settings SET value = ? WHERE user_id = ? AND key = 'openai_api_key'",
+                           (api_key, user['id']))
+            else:
+                db.execute("INSERT INTO settings (user_id, key, value) VALUES (?, 'openai_api_key', ?)",
+                           (user['id'], api_key))
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/fb/token', methods=['POST'])
 @require_auth
