@@ -2,7 +2,7 @@
 
 > เอกสารสำหรับ Agent คนถัดไป — อ่านก่อนเริ่มทำงานเสมอ
 
-**Last Updated:** 2026-05-17 14:17 GMT+8
+**Last Updated:** 2026-05-17 14:25 GMT+8
 **Last Agent:** OpenClaw (main session)
 **Repo:** https://github.com/photsathonspd1-create/facebook-acex-ads
 
@@ -52,6 +52,14 @@
 - [x] Emergency pause all
 - [x] SPA catch-all routing
 - [x] Webhook connect
+
+#### Setup & Configuration (2026-05-17 14:25)
+- [x] Setup page (`/setup`) — HTML form สำหรับตั้งค่า Facebook OAuth & OpenAI
+- [x] `/api/settings/facebook-oauth` (GET/POST) — ตั้งค่า FB App ID, Secret, Redirect URI ผ่าน UI
+- [x] `/api/settings/openai` (GET/POST) — ตั้งค่า OpenAI API Key ผ่าน UI
+- [x] Facebook OAuth อ่านค่าจาก DB ก่อน fallback ไป env vars
+- [x] App secret ซ่อนใน GET response (แสดงเป็น `***`)
+- [x] System check panel ในหน้า Setup (server, auth, FB, OpenAI, scheduler)
 
 ---
 
@@ -219,8 +227,13 @@ GET    /api/fb/audience
 POST   /api/bot/actions
 POST   /api/bot/actions/<id>/undo
 GET    /api/bot/actions
+GET    /api/settings/facebook-oauth   ← NEW
+POST   /api/settings/facebook-oauth   ← NEW
+GET    /api/settings/openai           ← NEW
+POST   /api/settings/openai           ← NEW
 GET    /
 GET    /guide
+GET    /setup                         ← NEW
 GET    /assets/<path>
 GET    /<path>                   ← SPA catch-all
 ```
