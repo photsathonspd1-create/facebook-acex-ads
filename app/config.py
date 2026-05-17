@@ -8,16 +8,22 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# Load .env file if it exists
-try:
-    with open('.env') as f:
-        for line in f:
-            line = line.strip()
-            if line and not line.startswith('#') and '=' in line:
-                key, val = line.split('=', 1)
-                os.environ.setdefault(key.strip(), val.strip())
-except FileNotFoundError:
-    pass
+# Load .env file — check both CWD and the project root (one level up from app/)
+_env_paths = [
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '.env'),
+    '.env',
+]
+for _env_path in _env_paths:
+    try:
+        with open(_env_path) as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith('#') and '=' in line:
+                    key, val = line.split('=', 1)
+                    os.environ.setdefault(key.strip(), val.strip())
+        break  # Stop after first .env found
+    except FileNotFoundError:
+        continue
 
 # Flask — generate a secure random key if not explicitly configured
 _configured_secret = os.environ.get('SECRET_KEY', '')

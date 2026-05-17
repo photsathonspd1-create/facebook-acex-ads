@@ -29,7 +29,11 @@ logging.basicConfig(
 )
 logger = logging.getLogger('scaler')
 
-app = Flask(__name__, static_folder='static', template_folder='templates')
+app = Flask(
+    __name__,
+    static_folder=os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'static'),
+    template_folder=os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'templates'),
+)
 app.secret_key = config.SECRET_KEY
 
 # Session security
@@ -163,7 +167,8 @@ def guide():
 
 @app.route('/assets/<path:path>')
 def send_assets(path):
-    return send_from_directory(os.path.join(app.root_path, 'static', 'assets'), path)
+    assets_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'static', 'assets')
+    return send_from_directory(assets_dir, path)
 
 # SPA catch-all: serve index.html for all non-API, non-static routes
 # This allows React Router to handle client-side routing

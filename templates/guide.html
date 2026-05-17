@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="th">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Acex Ads — Guide</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700;800&display=swap" />
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body { font-family: 'Kanit', sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.7; }
+      .container { max-width: 800px; margin: 0 auto; padding: 40px 24px; }
+      h1 { font-size: 2rem; background: linear-gradient(135deg, #3b82f6, #8b5cf6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 8px; }
+      h2 { font-size: 1.4rem; color: #93c5fd; margin: 32px 0 12px; }
+      p { margin-bottom: 12px; color: #94a3b8; }
+      .card { background: #1e293b; border-radius: 12px; padding: 20px; margin-bottom: 16px; border: 1px solid #334155; }
+      .card h3 { color: #e2e8f0; font-size: 1.1rem; margin-bottom: 8px; }
+      .card p { font-size: 0.95rem; }
+      code { background: #334155; padding: 2px 8px; border-radius: 4px; font-size: 0.9rem; color: #a5b4fc; }
+      .step { display: flex; gap: 16px; align-items: flex-start; margin-bottom: 16px; }
+      .step-num { background: #3b82f6; color: white; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 600; flex-shrink: 0; }
+      .back { display: inline-block; margin-bottom: 24px; color: #60a5fa; text-decoration: none; }
+      .back:hover { text-decoration: underline; }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <a href="/" class="back">← กลับหน้าหลัก</a>
+      <h1>📖 Acex Ads Guide</h1>
+      <p>คู่มือการใช้งาน Acex Ads — ระบบจัดการ Facebook Ads อัจฉริยะ</p>
+
+      <h2>🚀 เริ่มต้นใช้งาน</h2>
+      <div class="step">
+        <div class="step-num">1</div>
+        <div>
+          <h3>สมัครสมาชิก / เข้าสู่ระบบ</h3>
+          <p>ไปที่หน้า Settings แล้วสมัครสมาชิกด้วยอีเมล หรือเชื่อมต่อ Facebook OAuth</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div>
+          <h3>เชื่อมต่อ Facebook Token</h3>
+          <p>ไปที่ Settings → Facebook Token แล้ววาง Access Token จาก Facebook Marketing API</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div>
+          <h3>เลือก Ad Account</h3>
+          <p>เลือก Ad Account ที่ต้องการจัดการจาก dropdown ด้านบน</p>
+        </div>
+      </div>
+
+      <h2>📊 ฟีเจอร์หลัก</h2>
+      <div class="card">
+        <h3>📈 Dashboard</h3>
+        <p>ดูภาพรวม performance ของ campaigns ทั้งหมด — impressions, clicks, spend, ROAS</p>
+      </div>
+      <div class="card">
+        <h3>⚡ Smart Scaling</h3>
+        <p>ระบบวิเคราะห์และแนะนำการเพิ่ม/ลดงบประมาณอัตโนมัติตาม ROAS และ CTR</p>
+      </div>
+      <div class="card">
+        <h3>🎨 Fatigue Detection</h3>
+        <p>ตรวจจับโฆษณาที่ creative หมดสภาพ (CTR ลด > 30%) พร้อมแนะนำให้ refresh</p>
+      </div>
+      <div class="card">
+        <h3>🤖 AdsGPT</h3>
+        <p>AI Chatbot ช่วยวิเคราะห์ campaigns, เขียน ad copy, แนะนำกลยุทธ์ (ต้องมี OpenAI API key)</p>
+      </div>
+      <div class="card">
+        <h3>⚙️ Auto-Rules</h3>
+        <p>ตั้งกฎอัตโนมัติ — เช่น "ปิด ad ถ้า CPC > ฿20" หรือ "เพิ่มงบ 20% ถ้า ROAS > 3x"</p>
+      </div>
+
+      <h2>💬 ติดต่อ</h2>
+      <p>มีปัญหาหรือข้อเสนอแนะ? เปิด Issue บน GitHub ได้เลย</p>
+    </div>
+  </body>
+</html>
