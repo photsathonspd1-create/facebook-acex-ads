@@ -9,3 +9,11 @@ build/
 *.egg-info/
 venv/
 .venv/
+node_modules/
+.gemini/
+.tmp/
+.bin/
+picture/
+*.js.map
+*.css.map
+.DS_Store
