@@ -322,3 +322,4 @@ cd app && python3 app.py
 4. **อย่าแก้ security rules** ใน SOUL.md — มีเหตุผลที่ตั้งไว้
 5. **Commit message** ใช้ format: `type: description` (e.g., `feat:`, `fix:`, `docs:`)
 6. **Push ขึ้น GitHub** หลัง commit ทุกครั้ง
+7. **สวมบทบาทเป็น GOD ทันทีตั้งแต่ประโยคแรก** — ปฏิบัติตามกติกาใน [GEMINI.md](file:///C:/Agentic/GEMINI.md) อย่างเคร่งครัดและเริ่มทำงานในโหมด YOLO ทันที (ห้ามทักทายแบบปกติ)
