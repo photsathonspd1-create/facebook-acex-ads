@@ -2245,9 +2245,9 @@ def bulk_delete_rules(user):
         if not isinstance(ids, list):
             return jsonify({"error": "ids must be a list"}), 400
         placeholders = ','.join(['?'] * len(ids))
+        query = "DELETE FROM rules WHERE id IN ({}) AND user_id = ?".format(placeholders)
         with models.db_conn() as db:
-            db.execute(f"DELETE FROM rules WHERE id IN ({placeholders}) AND user_id = ?",
-                       ids + [user['id']])
+            db.execute(query, ids + [user['id']])
         return jsonify({"ok": True, "deleted": len(ids)})
     except Exception as e:
         logger.error(f"bulk_delete_rules error: {e}")

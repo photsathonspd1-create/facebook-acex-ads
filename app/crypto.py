@@ -39,28 +39,28 @@ def _get_fernet():
 
 
 def encrypt(plaintext: str) -> str:
-    """Encrypt a string. Returns base64 ciphertext, or plaintext if encryption unavailable."""
+    """Encrypt a string. Returns base64 ciphertext."""
     if not plaintext:
         return plaintext
     f = _get_fernet()
     if f is None:
-        return plaintext
+        raise RuntimeError("Encryption is disabled (no ENCRYPTION_KEY or SECRET_KEY)")
     try:
         return f.encrypt(plaintext.encode()).decode()
     except Exception as e:
         logger.error(f"Encryption error: {e}")
-        return plaintext
+        raise ValueError("Encryption failed") from e
 
 
 def decrypt(ciphertext: str) -> str:
-    """Decrypt a string. Returns plaintext, or ciphertext if encryption unavailable."""
+    """Decrypt a string. Returns plaintext."""
     if not ciphertext:
         return ciphertext
     f = _get_fernet()
     if f is None:
-        return ciphertext
+        raise RuntimeError("Decryption is disabled (no ENCRYPTION_KEY or SECRET_KEY)")
     try:
         return f.decrypt(ciphertext.encode()).decode()
-    except Exception:
-        # Not encrypted (legacy plaintext) — return as-is
-        return ciphertext
+    except Exception as e:
+        logger.error(f"Decryption error: {e}")
+        raise ValueError("Decryption failed. Token might be corrupt or unencrypted.") from e

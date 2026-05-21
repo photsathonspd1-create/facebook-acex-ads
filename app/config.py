@@ -28,10 +28,11 @@ for _env_path in _env_paths:
 # Flask — generate a secure random key if not explicitly configured
 _configured_secret = os.environ.get('SECRET_KEY', '')
 if not _configured_secret or _configured_secret == 'change-me-in-production':
-    SECRET_KEY = secrets.token_hex(32)
+    # Fallback to a static default to maintain session stability across workers, 
+    # instead of randomizing every time which breaks sessions.
+    SECRET_KEY = "fallback-static-secret-key-for-development"
     logger.warning(
-        "SECRET_KEY not configured — using auto-generated key. "
-        "Sessions will NOT persist across restarts. "
+        "SECRET_KEY not configured — using static fallback key. "
         "Set SECRET_KEY in .env for production."
     )
 else:
