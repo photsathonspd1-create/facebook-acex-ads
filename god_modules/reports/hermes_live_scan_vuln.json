@@ -1,0 +1,10 @@
+{
+  "SchemaVersion": 2,
+  "Trivy": {
+    "Version": "0.70.0"
+  },
+  "ReportID": "019e5000-490a-7355-8c31-627b13de1cb7",
+  "CreatedAt": "2026-05-22T21:04:16.522252617+07:00",
+  "ArtifactName": "/mnt/c/Agentic/app",
+  "ArtifactType": "filesystem"
+}

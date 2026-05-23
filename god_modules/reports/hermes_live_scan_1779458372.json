@@ -1,0 +1,5 @@
+{
+  "scan_target": "/mnt/c/Agentic/app",
+  "secrets_report": "/mnt/c/Agentic/god_modules/reports/hermes_live_scan_secrets.json",
+  "vuln_report": "/mnt/c/Agentic/god_modules/reports/hermes_live_scan_vuln.json"
+}
